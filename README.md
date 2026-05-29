@@ -54,6 +54,28 @@ curl -X POST localhost:21465/api/mysession/start-session
 curl localhost:21465/api/mysession/status-session    # contains urlcode to render
 ```
 
+## whatsmeow fork (`wppconnect-team/whatsmeow`)
+
+This project depends on whatsmeow through the WPPConnect fork, wired with a
+`replace` directive in `go.mod`:
+
+```
+replace go.mau.fi/whatsmeow => github.com/wppconnect-team/whatsmeow main
+```
+
+The code still imports `go.mau.fi/whatsmeow` (idiomatic); Go redirects it to the
+fork at build time. This lets collaborators **fix a bug in the fork, push to its
+`main`, use it here immediately**, and then open a PR upstream to `tulir/whatsmeow`.
+
+To pull a new fork revision after pushing to the fork's `main`:
+
+```bash
+go get go.mau.fi/whatsmeow@main   # resolves via the replace to the fork
+go mod tidy
+```
+
+To temporarily build against upstream instead, comment out the `replace` line.
+
 ## Compatibility notes (Node/WPPConnect vs Go/whatsmeow)
 
 Some WhatsApp-Web-only features have **no equivalent** in whatsmeow and will not

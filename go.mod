@@ -28,3 +28,5 @@ require (
 	golang.org/x/text v0.37.0 // indirect
 	google.golang.org/protobuf v1.36.11 // indirect
 )
+
+replace go.mau.fi/whatsmeow => github.com/wppconnect-team/whatsmeow v0.0.0-20260529101937-a7ea56383ec4
