@@ -1,0 +1,6 @@
+/server
+/server.exe
+userDataDir/
+*.db
+*.log
+.DS_Store

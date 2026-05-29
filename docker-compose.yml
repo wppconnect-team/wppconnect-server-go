@@ -1,0 +1,17 @@
+services:
+  wppconnect-go:
+    container_name: wpp-server-go
+    build: .
+    restart: unless-stopped
+    environment:
+      PORT: "21465"
+      SECRET_KEY: "THISISMYSECURETOKEN"
+      WEBHOOK_URL: ""
+      DATA_DIR: "/data"
+    volumes:
+      - wpp_go_data:/data
+    ports:
+      - "21465:21465"
+
+volumes:
+  wpp_go_data: {}
