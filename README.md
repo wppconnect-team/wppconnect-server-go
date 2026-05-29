@@ -27,16 +27,21 @@ internal/httpapi      chi router with Node-compatible routes
 
 ## Endpoints (MVP)
 
-| Method | Path                            | Node equivalent      |
-| ------ | ------------------------------- | -------------------- |
-| POST   | `/api/{session}/start-session`  | same                 |
-| GET    | `/api/{session}/status-session` | same                 |
-| POST   | `/api/{session}/send-message`   | same                 |
-| POST   | `/api/{session}/close-session`  | same                 |
-| GET    | `/healthz`                      | same                 |
+| Method | Path                                          | Node equivalent |
+| ------ | --------------------------------------------- | --------------- |
+| POST   | `/api/{session}/start-session`                | same            |
+| GET    | `/api/{session}/status-session`               | same            |
+| POST   | `/api/{session}/send-message`                 | same            |
+| POST   | `/api/{session}/send-image`                   | same (base64)   |
+| POST   | `/api/{session}/send-seen`                    | same            |
+| GET    | `/api/{session}/check-number-status/{phone}`  | same            |
+| GET    | `/api/{session}/all-groups`                   | same            |
+| POST   | `/api/{session}/close-session`                | same            |
+| GET    | `/healthz`                                     | same            |
 
-`send-message` accepts the same body as the Node server: `phone` (string or
-array), `message`, `isGroup`.
+Payloads match the Node server: `send-message` takes `phone` (string or array),
+`message`, `isGroup`; `send-image` takes `phone`, `base64` (raw or data URL),
+`caption`, `isGroup`; `send-seen` takes `phone`.
 
 ## Run
 
