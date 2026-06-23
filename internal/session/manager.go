@@ -14,6 +14,8 @@ import (
 	"go.mau.fi/whatsmeow/store/sqlstore"
 	"go.mau.fi/whatsmeow/types/events"
 	waLog "go.mau.fi/whatsmeow/util/log"
+
+	_ "modernc.org/sqlite"
 )
 
 // Status mirrors the connection states exposed by the Node server so HTTP
@@ -87,7 +89,7 @@ func (m *Manager) openContainer(ctx context.Context, name string) (*sqlstore.Con
 		return nil, err
 	}
 	dbPath := filepath.Join(m.dataDir, safeName(name)+".db")
-	container, err := sqlstore.New(ctx, "sqlite3", "file:"+dbPath+"?_foreign_keys=on", m.log)
+	container, err := sqlstore.New(ctx, "sqlite", "file:"+dbPath+"?_pragma=foreign_keys(1)", m.log)
 	if err != nil {
 		return nil, fmt.Errorf("open store: %w", err)
 	}
