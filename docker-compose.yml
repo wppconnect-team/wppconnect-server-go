@@ -1,6 +1,7 @@
 services:
   wppconnect-go:
     container_name: wpp-server-go
+    image: wppconnect/wppconnect-server-go:latest
     build: .
     restart: unless-stopped
     environment:

@@ -1,5 +1,5 @@
 # Build stage
-FROM golang:1.23-alpine AS build
+FROM golang:1.25-alpine AS build
 RUN apk add --no-cache gcc musl-dev   # cgo for go-sqlite3
 WORKDIR /src
 COPY go.mod ./
