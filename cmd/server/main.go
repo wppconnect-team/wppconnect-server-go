@@ -8,7 +8,6 @@ import (
 	"log"
 	"net/http"
 	"os"
-	"path/filepath"
 
 	"github.com/wppconnect-team/wppconnect-server-go/internal/config"
 	"github.com/wppconnect-team/wppconnect-server-go/internal/httpapi"
@@ -22,10 +21,8 @@ func main() {
 	if err := os.MkdirAll(cfg.DataDir, 0o755); err != nil {
 		log.Fatalf("create data dir: %v", err)
 	}
-	dbPath := filepath.Join(cfg.DataDir, "store.db")
-
 	sink := webhook.New(cfg.WebhookURL)
-	mgr, err := session.NewManager(context.Background(), dbPath, sink)
+	mgr, err := session.NewManager(context.Background(), cfg.DataDir, sink)
 	if err != nil {
 		log.Fatalf("session manager: %v", err)
 	}

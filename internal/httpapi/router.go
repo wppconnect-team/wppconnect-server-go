@@ -12,11 +12,13 @@ import (
 	"time"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/skip2/go-qrcode"
 	"github.com/wppconnect-team/wppconnect-server-go/internal/config"
 	"github.com/wppconnect-team/wppconnect-server-go/internal/session"
 	"go.mau.fi/whatsmeow"
 	"go.mau.fi/whatsmeow/proto/waE2E"
 	"go.mau.fi/whatsmeow/types"
+	"golang.org/x/crypto/bcrypt"
 )
 
 // Server wires the routes to the session manager.
@@ -33,34 +35,73 @@ func NewRouter(cfg config.Config, mgr *session.Manager) http.Handler {
 	r.Get("/healthz", func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	})
+	r.Get("/api/dashboard/stats", s.dashboardStats)
 
-	// Mirrors POST /api/:session/start-session
-	r.Post("/api/{session}/start-session", s.startSession)
-	// Mirrors GET /api/:session/status-session
-	r.Get("/api/{session}/status-session", s.statusSession)
-	// Mirrors POST /api/:session/send-message
-	r.Post("/api/{session}/send-message", s.sendMessage)
-	// Mirrors POST /api/:session/close-session
-	r.Post("/api/{session}/close-session", s.closeSession)
-	// Mirrors POST /api/:session/send-image (base64)
-	r.Post("/api/{session}/send-image", s.sendImage)
-	// Mirrors POST /api/:session/send-seen
-	r.Post("/api/{session}/send-seen", s.sendSeen)
-	// Mirrors GET /api/:session/check-number-status/:phone
-	r.Get("/api/{session}/check-number-status/{phone}", s.checkNumber)
-	// Mirrors GET /api/:session/all-groups
-	r.Get("/api/{session}/all-groups", s.allGroups)
+	r.Group(func(protected chi.Router) {
+		protected.Use(s.auth)
+		// Mirrors POST /api/:session/start-session
+		protected.Post("/api/{session}/start-session", s.startSession)
+		// Mirrors GET /api/:session/status-session
+		protected.Get("/api/{session}/status-session", s.statusSession)
+		protected.Get("/api/{session}/qrcode-session", s.qrcodeSession)
+		// Mirrors POST /api/:session/send-message
+		protected.Post("/api/{session}/send-message", s.sendMessage)
+		// Mirrors POST /api/:session/close-session and logout-session
+		protected.Post("/api/{session}/close-session", s.closeSession)
+		protected.Post("/api/{session}/logout-session", s.closeSession)
+		// Mirrors POST /api/:session/send-image (base64)
+		protected.Post("/api/{session}/send-image", s.sendImage)
+		// Mirrors POST /api/:session/send-seen
+		protected.Post("/api/{session}/send-seen", s.sendSeen)
+		// Mirrors GET /api/:session/check-number-status/:phone
+		protected.Get("/api/{session}/check-number-status/{phone}", s.checkNumber)
+		// Mirrors GET /api/:session/all-groups
+		protected.Get("/api/{session}/all-groups", s.allGroups)
+		protected.Get("/api/{session}/group-members/{groupId}", s.notSupported("groups"))
+		protected.Post("/api/{session}/create-group", s.notSupported("groups"))
+	})
 
 	return r
+}
+
+func (s *Server) auth(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		sessionName := cleanSession(chi.URLParam(r, "session"))
+		auth := r.Header.Get("Authorization")
+		token := ""
+		if parts := strings.SplitN(auth, " ", 2); len(parts) == 2 {
+			token = parts[1]
+		}
+		if token == "" {
+			writeJSON(w, http.StatusUnauthorized, map[string]any{
+				"message": "Token is not present. Check your header and try again",
+			})
+			return
+		}
+		if err := bcrypt.CompareHashAndPassword([]byte(token), []byte(sessionName+s.cfg.SecretKey)); err != nil {
+			writeJSON(w, http.StatusUnauthorized, map[string]any{
+				"error": "Check that the Session and Token are correct",
+			})
+			return
+		}
+		next.ServeHTTP(w, r)
+	})
+}
+
+func cleanSession(name string) string {
+	if idx := strings.Index(name, ":"); idx >= 0 {
+		return name[:idx]
+	}
+	return name
 }
 
 // connected returns the live handle for a connected session, or writes the
 // standard "disconnected" response and returns false.
 func (s *Server) connected(w http.ResponseWriter, name string) (*session.Handle, bool) {
-	h, ok := s.mgr.Get(name)
+	h, ok := s.mgr.Get(cleanSession(name))
 	if !ok || h.Status != session.StatusConnected {
 		writeJSON(w, http.StatusNotFound, map[string]any{
-			"status": "disconnected", "session": name,
+			"status": "disconnected", "session": cleanSession(name),
 		})
 		return nil, false
 	}
@@ -73,7 +114,7 @@ func userJID(phone string) types.JID {
 }
 
 func (s *Server) startSession(w http.ResponseWriter, r *http.Request) {
-	name := chi.URLParam(r, "session")
+	name := cleanSession(chi.URLParam(r, "session"))
 	h, err := s.mgr.Start(context.Background(), name)
 	if err != nil {
 		writeJSON(w, http.StatusInternalServerError, map[string]any{
@@ -87,7 +128,7 @@ func (s *Server) startSession(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) statusSession(w http.ResponseWriter, r *http.Request) {
-	name := chi.URLParam(r, "session")
+	name := cleanSession(chi.URLParam(r, "session"))
 	h, ok := s.mgr.Get(name)
 	if !ok {
 		writeJSON(w, http.StatusOK, map[string]any{"status": "CLOSED", "session": name})
@@ -98,6 +139,26 @@ func (s *Server) statusSession(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+func (s *Server) qrcodeSession(w http.ResponseWriter, r *http.Request) {
+	name := cleanSession(chi.URLParam(r, "session"))
+	h, ok := s.mgr.Get(name)
+	if !ok || h.QRCode == "" {
+		writeJSON(w, http.StatusOK, map[string]any{
+			"status":  "QRCODE_NOT_AVAILABLE",
+			"message": "QRCode is not available...",
+		})
+		return
+	}
+	png, err := qrcode.Encode(h.QRCode, qrcode.Medium, 500)
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]any{"status": "error", "message": err.Error()})
+		return
+	}
+	w.Header().Set("Content-Type", "image/png")
+	w.WriteHeader(http.StatusOK)
+	_, _ = w.Write(png)
+}
+
 type sendMessageReq struct {
 	Phone   any    `json:"phone"` // string or []string, like the Node server
 	Message string `json:"message"`
@@ -105,7 +166,7 @@ type sendMessageReq struct {
 }
 
 func (s *Server) sendMessage(w http.ResponseWriter, r *http.Request) {
-	name := chi.URLParam(r, "session")
+	name := cleanSession(chi.URLParam(r, "session"))
 	h, ok := s.mgr.Get(name)
 	if !ok || h.Status != session.StatusConnected {
 		writeJSON(w, http.StatusNotFound, map[string]any{
@@ -139,7 +200,7 @@ func (s *Server) sendMessage(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) closeSession(w http.ResponseWriter, r *http.Request) {
-	name := chi.URLParam(r, "session")
+	name := cleanSession(chi.URLParam(r, "session"))
 	s.mgr.Close(name)
 	writeJSON(w, http.StatusOK, map[string]any{"status": "success", "session": name})
 }
@@ -257,8 +318,8 @@ func (s *Server) checkNumber(w http.ResponseWriter, r *http.Request) {
 		wid = resp[0].JID.String()
 	}
 	writeJSON(w, http.StatusOK, map[string]any{
-		"status":       "success",
-		"response":     map[string]any{"numberExists": numberExists, "id": wid},
+		"status":   "success",
+		"response": map[string]any{"numberExists": numberExists, "id": wid},
 	})
 }
 
@@ -282,6 +343,48 @@ func (s *Server) allGroups(w http.ResponseWriter, r *http.Request) {
 		})
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"status": "success", "response": out})
+}
+
+func (s *Server) dashboardStats(w http.ResponseWriter, _ *http.Request) {
+	handles := s.mgr.List()
+	sessions := make([]map[string]any, 0, len(handles))
+	connected := 0
+	for _, h := range handles {
+		if h.Status == session.StatusConnected {
+			connected++
+		}
+		sessions = append(sessions, map[string]any{
+			"session":   h.Name,
+			"origin":    "unknown",
+			"runtime":   "wppconnect-server-go",
+			"provider":  "whatsmeow",
+			"status":    h.Status,
+			"connected": h.Status == session.StatusConnected,
+		})
+	}
+	writeJSON(w, http.StatusOK, map[string]any{
+		"updatedAt": time.Now().UTC().Format(time.RFC3339),
+		"overview": map[string]any{
+			"runtime":       "wppconnect-server-go",
+			"sessions":      len(sessions),
+			"totalSessions": len(sessions),
+			"connected":     connected,
+			"disconnected":  len(sessions) - connected,
+			"byProvider":    map[string]int{"whatsmeow": len(sessions)},
+		},
+		"sessions": sessions,
+	})
+}
+
+func (s *Server) notSupported(capability string) http.HandlerFunc {
+	return func(w http.ResponseWriter, _ *http.Request) {
+		writeJSON(w, http.StatusNotImplemented, map[string]any{
+			"status":     "not_supported",
+			"provider":   "whatsmeow",
+			"capability": capability,
+			"message":    "Capability is not supported by wppconnect-server-go yet.",
+		})
+	}
 }
 
 func toList(v any) []string {

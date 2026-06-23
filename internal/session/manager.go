@@ -5,6 +5,9 @@ package session
 import (
 	"context"
 	"fmt"
+	"os"
+	"path/filepath"
+	"strings"
 	"sync"
 
 	"go.mau.fi/whatsmeow"
@@ -43,25 +46,21 @@ type EventSink interface {
 
 // Manager owns all live sessions, keyed by name.
 type Manager struct {
-	mu        sync.RWMutex
-	sessions  map[string]*Handle
-	container *sqlstore.Container
-	sink      EventSink
-	log       waLog.Logger
+	mu       sync.RWMutex
+	sessions map[string]*Handle
+	dataDir  string
+	sink     EventSink
+	log      waLog.Logger
 }
 
-// NewManager creates a session manager backed by a SQLite store at dbPath.
-func NewManager(ctx context.Context, dbPath string, sink EventSink) (*Manager, error) {
+// NewManager creates a session manager backed by one SQLite store per session.
+func NewManager(_ context.Context, dataDir string, sink EventSink) (*Manager, error) {
 	logger := waLog.Stdout("wppgo", "INFO", true)
-	container, err := sqlstore.New(ctx, "sqlite3", "file:"+dbPath+"?_foreign_keys=on", logger)
-	if err != nil {
-		return nil, fmt.Errorf("open store: %w", err)
-	}
 	return &Manager{
-		sessions:  make(map[string]*Handle),
-		container: container,
-		sink:      sink,
-		log:       logger,
+		sessions: make(map[string]*Handle),
+		dataDir:  dataDir,
+		sink:     sink,
+		log:      logger,
 	}, nil
 }
 
@@ -73,6 +72,39 @@ func (m *Manager) Get(name string) (*Handle, bool) {
 	return h, ok
 }
 
+func (m *Manager) List() []*Handle {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	out := make([]*Handle, 0, len(m.sessions))
+	for _, h := range m.sessions {
+		out = append(out, h)
+	}
+	return out
+}
+
+func (m *Manager) openContainer(ctx context.Context, name string) (*sqlstore.Container, error) {
+	if err := os.MkdirAll(m.dataDir, 0o755); err != nil {
+		return nil, err
+	}
+	dbPath := filepath.Join(m.dataDir, safeName(name)+".db")
+	container, err := sqlstore.New(ctx, "sqlite3", "file:"+dbPath+"?_foreign_keys=on", m.log)
+	if err != nil {
+		return nil, fmt.Errorf("open store: %w", err)
+	}
+	return container, nil
+}
+
+func safeName(name string) string {
+	name = filepath.Base(name)
+	name = strings.ReplaceAll(name, ":", "_")
+	name = strings.ReplaceAll(name, "/", "_")
+	name = strings.ReplaceAll(name, "\\", "_")
+	if name == "." || name == "" {
+		return "default"
+	}
+	return name
+}
+
 // Start creates (or reuses) a session and begins connecting. It registers the
 // event handlers that forward QR / connection / message events to the sink.
 func (m *Manager) Start(ctx context.Context, name string) (*Handle, error) {
@@ -82,7 +114,12 @@ func (m *Manager) Start(ctx context.Context, name string) (*Handle, error) {
 		return h, nil
 	}
 
-	deviceStore, err := m.container.GetFirstDevice(ctx)
+	container, err := m.openContainer(ctx, name)
+	if err != nil {
+		m.mu.Unlock()
+		return nil, err
+	}
+	deviceStore, err := container.GetFirstDevice(ctx)
 	if err != nil {
 		m.mu.Unlock()
 		return nil, fmt.Errorf("get device: %w", err)
