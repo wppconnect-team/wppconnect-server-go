@@ -47,9 +47,40 @@ Payloads match the Node server: `send-message` takes `phone` (string or array),
 
 ```bash
 go run ./cmd/server
-# or
-docker compose up --build
 ```
+
+## Docker
+
+The official image is published to Docker Hub as
+`wppconnect/wppconnect-server-go`.
+
+Run the production compose example:
+
+```bash
+SECRET_KEY=change-me docker compose up -d
+curl http://localhost:21465/healthz
+```
+
+Use `WPP_SERVER_GO_TAG` to pin a specific image tag:
+
+```bash
+WPP_SERVER_GO_TAG=0.1.0 SECRET_KEY=change-me docker compose up -d
+```
+
+The container is configured through `PORT`, `SECRET_KEY`, `WEBHOOK_URL`, and
+`DATA_DIR`. The compose example persists `DATA_DIR` at `/data`.
+
+Docker image publishing is handled by GitHub Actions:
+
+- pushes to `main` publish the moving `main` tag and a `sha-*` tag;
+- pushes to `develop` publish the moving `develop` tag and a `sha-*` tag;
+- tags like `v0.1.0` publish `0.1.0`, `0.1`, `0`, the git ref tag, `sha-*`,
+  and `latest`;
+- pull requests build the image without pushing it.
+
+The Docker Hub organization must contain a public repository named
+`wppconnect-server-go`, and this GitHub repository must have the secrets
+`DOCKERHUB_USERNAME` and `DOCKERHUB_TOKEN`.
 
 Then start a session and watch the logs for the QR (also delivered via webhook
 as the `qrcode` event):
