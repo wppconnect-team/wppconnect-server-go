@@ -46,6 +46,8 @@ func NewRouter(cfg config.Config, mgr *session.Manager) http.Handler {
 		protected.Get("/api/{session}/qrcode-session", s.qrcodeSession)
 		// Mirrors POST /api/:session/send-message
 		protected.Post("/api/{session}/send-message", s.sendMessage)
+		protected.Post("/api/{session}/send-location", s.notSupported("location"))
+		protected.Post("/api/{session}/send-file-base64", s.notSupported("media"))
 		// Mirrors POST /api/:session/close-session and logout-session
 		protected.Post("/api/{session}/close-session", s.closeSession)
 		protected.Post("/api/{session}/logout-session", s.closeSession)
