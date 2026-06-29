@@ -5,11 +5,13 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/wppconnect-team/wppconnect-server-go/internal/config"
 	"github.com/wppconnect-team/wppconnect-server-go/internal/session"
+	"golang.org/x/crypto/bcrypt"
 )
 
 func TestRouterMatchesNodeCompatibilitySurface(t *testing.T) {
@@ -80,5 +82,51 @@ func TestUnsupportedCompatibilityRouteReturnsJSON501(t *testing.T) {
 	}
 	if body["status"] != "not_supported" || body["runtime"] != "wppconnect-server-go" {
 		t.Fatalf("unexpected body: %#v", body)
+	}
+}
+
+func TestFunctionalCompatibilityRoutesDoNotReturnNotSupported(t *testing.T) {
+	mgr, err := session.NewManager(context.Background(), t.TempDir(), nil)
+	if err != nil {
+		t.Fatalf("NewManager() error = %v", err)
+	}
+
+	router := NewRouter(config.Config{SecretKey: "secret"}, mgr)
+	token, err := bcrypt.GenerateFromPassword([]byte("demo"+"secret"), bcrypt.DefaultCost)
+	if err != nil {
+		t.Fatalf("GenerateFromPassword() error = %v", err)
+	}
+
+	tests := []struct {
+		method string
+		path   string
+		body   string
+	}{
+		{http.MethodPost, "/api/demo/send-location", `{"phone":"5511999999999","lat":-23.5,"lng":-46.6}`},
+		{http.MethodPost, "/api/demo/send-file-base64", `{"phone":"5511999999999","base64":"aGk=","mimetype":"text/plain","filename":"hi.txt"}`},
+		{http.MethodPost, "/api/demo/send-file", `{"phone":"5511999999999","base64":"aGk=","mimetype":"text/plain","filename":"hi.txt"}`},
+		{http.MethodGet, "/api/demo/group-info/123@g.us", ``},
+		{http.MethodGet, "/api/demo/group-admins/123@g.us", ``},
+		{http.MethodGet, "/api/demo/group-members-ids/123@g.us", ``},
+	}
+
+	for _, tt := range tests {
+		req := httptest.NewRequest(tt.method, tt.path, strings.NewReader(tt.body))
+		req.Header.Set("Authorization", "Bearer "+string(token))
+		req.Header.Set("Content-Type", "application/json")
+		res := httptest.NewRecorder()
+
+		router.ServeHTTP(res, req)
+		if res.Code == http.StatusNotImplemented {
+			t.Fatalf("%s %s returned 501: %s", tt.method, tt.path, res.Body.String())
+		}
+
+		var body map[string]any
+		if err := json.Unmarshal(res.Body.Bytes(), &body); err != nil {
+			t.Fatalf("%s %s response is not JSON: %v", tt.method, tt.path, err)
+		}
+		if body["status"] == "not_supported" {
+			t.Fatalf("%s %s returned not_supported body: %#v", tt.method, tt.path, body)
+		}
 	}
 }

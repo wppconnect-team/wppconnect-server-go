@@ -2,9 +2,11 @@
 package httpapi
 
 import (
+	"net/http"
 	"strings"
 
 	"github.com/go-chi/chi/v5"
+	"go.mau.fi/whatsmeow"
 )
 
 type compatibilityRoute struct {
@@ -163,7 +165,40 @@ func (s *Server) registerNodeCompatibilityRoutes(public chi.Router, protected ch
 		if requiresSessionToken(route.path) {
 			target = protected
 		}
-		target.Method(route.method, route.path, s.notSupported(route.capability))
+		target.Method(route.method, route.path, s.compatibilityHandler(route))
+	}
+}
+
+func (s *Server) compatibilityHandler(route compatibilityRoute) http.HandlerFunc {
+	switch route.path {
+	case "/api/{session}/check-connection-session":
+		return s.statusSession
+	case "/api/{session}/send-file":
+		return s.sendFile
+	case "/api/{session}/send-voice", "/api/{session}/send-voice-base64":
+		return s.sendVoice
+	case "/api/{session}/group-info/{groupId}":
+		return func(w http.ResponseWriter, r *http.Request) { s.groupInfo(w, r, "info") }
+	case "/api/{session}/group-members-ids/{groupId}":
+		return func(w http.ResponseWriter, r *http.Request) { s.groupInfo(w, r, "memberIDs") }
+	case "/api/{session}/group-admins/{groupId}":
+		return func(w http.ResponseWriter, r *http.Request) { s.groupInfo(w, r, "admins") }
+	case "/api/{session}/leave-group":
+		return s.leaveGroup
+	case "/api/{session}/add-participant-group":
+		return s.updateGroupParticipants(whatsmeow.ParticipantChangeAdd)
+	case "/api/{session}/remove-participant-group":
+		return s.updateGroupParticipants(whatsmeow.ParticipantChangeRemove)
+	case "/api/{session}/promote-participant-group":
+		return s.updateGroupParticipants(whatsmeow.ParticipantChangePromote)
+	case "/api/{session}/demote-participant-group":
+		return s.updateGroupParticipants(whatsmeow.ParticipantChangeDemote)
+	case "/api/{session}/group-subject":
+		return s.setGroupSubject
+	case "/api/{session}/group-description":
+		return s.setGroupDescription
+	default:
+		return s.notSupported(route.capability)
 	}
 }
 

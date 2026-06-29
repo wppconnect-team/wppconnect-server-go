@@ -7,7 +7,11 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
+	"io"
+	"mime"
 	"net/http"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -46,8 +50,8 @@ func NewRouter(cfg config.Config, mgr *session.Manager) http.Handler {
 		protected.Get("/api/{session}/qrcode-session", s.qrcodeSession)
 		// Mirrors POST /api/:session/send-message
 		protected.Post("/api/{session}/send-message", s.sendMessage)
-		protected.Post("/api/{session}/send-location", s.notSupported("location"))
-		protected.Post("/api/{session}/send-file-base64", s.notSupported("media"))
+		protected.Post("/api/{session}/send-location", s.sendLocation)
+		protected.Post("/api/{session}/send-file-base64", s.sendFileBase64)
 		// Mirrors POST /api/:session/close-session and logout-session
 		protected.Post("/api/{session}/close-session", s.closeSession)
 		protected.Post("/api/{session}/logout-session", s.closeSession)
@@ -59,8 +63,8 @@ func NewRouter(cfg config.Config, mgr *session.Manager) http.Handler {
 		protected.Get("/api/{session}/check-number-status/{phone}", s.checkNumber)
 		// Mirrors GET /api/:session/all-groups
 		protected.Get("/api/{session}/all-groups", s.allGroups)
-		protected.Get("/api/{session}/group-members/{groupId}", s.notSupported("groups"))
-		protected.Post("/api/{session}/create-group", s.notSupported("groups"))
+		protected.Get("/api/{session}/group-members/{groupId}", s.groupMembers)
+		protected.Post("/api/{session}/create-group", s.createGroup)
 
 		s.registerNodeCompatibilityRoutes(r, protected)
 	})
@@ -112,9 +116,26 @@ func (s *Server) connected(w http.ResponseWriter, name string) (*session.Handle,
 	return h, true
 }
 
+func chatJID(id string, isGroup bool) types.JID {
+	id = strings.TrimSpace(id)
+	if strings.Contains(id, "@") {
+		if jid, err := types.ParseJID(id); err == nil {
+			return jid
+		}
+		id = strings.Split(id, "@")[0]
+	}
+	if isGroup {
+		return types.NewJID(id, types.GroupServer)
+	}
+	return types.NewJID(id, types.DefaultUserServer)
+}
+
 func userJID(phone string) types.JID {
-	phone = strings.Split(phone, "@")[0]
-	return types.NewJID(phone, types.DefaultUserServer)
+	return chatJID(phone, false)
+}
+
+func groupJID(id string) types.JID {
+	return chatJID(id, true)
 }
 
 func (s *Server) startSession(w http.ResponseWriter, r *http.Request) {
@@ -186,10 +207,7 @@ func (s *Server) sendMessage(w http.ResponseWriter, r *http.Request) {
 	}
 
 	for _, phone := range toList(req.Phone) {
-		jid := types.NewJID(phone, types.DefaultUserServer)
-		if req.IsGroup {
-			jid = types.NewJID(phone, types.GroupServer)
-		}
+		jid := chatJID(phone, req.IsGroup)
 		_, err := h.Client.SendMessage(context.Background(), jid, &waE2E.Message{
 			Conversation: &req.Message,
 		})
@@ -209,61 +227,166 @@ func (s *Server) closeSession(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{"status": "success", "session": name})
 }
 
-type sendImageReq struct {
-	Phone   string `json:"phone"`
-	Base64  string `json:"base64"`
-	Caption string `json:"caption"`
-	IsGroup bool   `json:"isGroup"`
+type sendLocationReq struct {
+	Phone     any     `json:"phone"`
+	Lat       float64 `json:"lat"`
+	Lng       float64 `json:"lng"`
+	Latitude  float64 `json:"latitude"`
+	Longitude float64 `json:"longitude"`
+	Title     string  `json:"title"`
+	Name      string  `json:"name"`
+	Address   string  `json:"address"`
+	URL       string  `json:"url"`
+	IsGroup   bool    `json:"isGroup"`
+}
+
+func (s *Server) sendLocation(w http.ResponseWriter, r *http.Request) {
+	h, ok := s.connected(w, chi.URLParam(r, "session"))
+	if !ok {
+		return
+	}
+	var req sendLocationReq
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]any{"status": "error", "message": "invalid json"})
+		return
+	}
+	lat, lng := req.Lat, req.Lng
+	if lat == 0 {
+		lat = req.Latitude
+	}
+	if lng == 0 {
+		lng = req.Longitude
+	}
+	if lat == 0 && lng == 0 {
+		writeJSON(w, http.StatusBadRequest, map[string]any{"status": "error", "message": "lat/lng is required"})
+		return
+	}
+	title := req.Title
+	if title == "" {
+		title = req.Name
+	}
+	msg := &waE2E.Message{LocationMessage: &waE2E.LocationMessage{
+		DegreesLatitude:  &lat,
+		DegreesLongitude: &lng,
+		Name:             strPtr(title),
+		Address:          strPtr(req.Address),
+		URL:              strPtr(req.URL),
+	}}
+	if err := s.sendToTargets(h, req.Phone, req.IsGroup, msg); err != nil {
+		writeSendError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusCreated, map[string]any{"status": "success"})
+}
+
+type sendMediaReq struct {
+	Phone    any    `json:"phone"`
+	Base64   string `json:"base64"`
+	File     string `json:"file"`
+	Path     string `json:"path"`
+	FileName string `json:"filename"`
+	Filename string `json:"fileName"`
+	Caption  string `json:"caption"`
+	Mimetype string `json:"mimetype"`
+	MimeType string `json:"mimeType"`
+	IsGroup  bool   `json:"isGroup"`
+	PTT      bool   `json:"ptt"`
 }
 
 // sendImage uploads a base64 image and sends it. Mirrors POST send-image (the
 // base64 variant of the Node server).
 func (s *Server) sendImage(w http.ResponseWriter, r *http.Request) {
+	s.sendMediaJSON(w, r, whatsmeow.MediaImage, "image/jpeg", false)
+}
+
+func (s *Server) sendFileBase64(w http.ResponseWriter, r *http.Request) {
+	s.sendMediaJSON(w, r, "", "", false)
+}
+
+func (s *Server) sendFile(w http.ResponseWriter, r *http.Request) {
+	if strings.HasPrefix(r.Header.Get("Content-Type"), "multipart/form-data") {
+		s.sendMediaMultipart(w, r)
+		return
+	}
+	s.sendMediaJSON(w, r, "", "", false)
+}
+
+func (s *Server) sendVoice(w http.ResponseWriter, r *http.Request) {
+	s.sendMediaJSON(w, r, whatsmeow.MediaAudio, "audio/ogg", true)
+}
+
+func (s *Server) sendMediaJSON(w http.ResponseWriter, r *http.Request, forcedType whatsmeow.MediaType, fallbackMime string, forcePTT bool) {
 	h, ok := s.connected(w, chi.URLParam(r, "session"))
 	if !ok {
 		return
 	}
-	var req sendImageReq
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.Base64 == "" {
-		writeJSON(w, http.StatusBadRequest, map[string]any{"status": "error"})
+	var req sendMediaReq
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]any{"status": "error", "message": "invalid json"})
 		return
 	}
 
-	// Accept raw base64 or a data URL (data:image/png;base64,....).
-	payload := req.Base64
-	if i := strings.Index(payload, ","); strings.HasPrefix(payload, "data:") && i >= 0 {
-		payload = payload[i+1:]
-	}
-	data, err := base64.StdEncoding.DecodeString(payload)
+	payload := firstNonEmpty(req.Base64, req.File, req.Path)
+	data, detectedMime, err := decodeBase64Payload(payload)
 	if err != nil {
-		writeJSON(w, http.StatusBadRequest, map[string]any{"status": "error", "message": "invalid base64"})
+		writeJSON(w, http.StatusBadRequest, map[string]any{"status": "error", "message": err.Error()})
 		return
 	}
 
-	ctx := context.Background()
-	uploaded, err := h.Client.Upload(ctx, data, whatsmeow.MediaImage)
+	mimetype := firstNonEmpty(req.Mimetype, req.MimeType, detectedMime, fallbackMime, "application/octet-stream")
+	filename := firstNonEmpty(req.FileName, req.Filename, defaultFilename(mimetype))
+	msg, err := s.buildMediaMessage(h, data, forcedType, mimetype, filename, req.Caption, req.PTT || forcePTT)
 	if err != nil {
-		writeJSON(w, http.StatusInternalServerError, map[string]any{"status": "error", "message": err.Error()})
+		writeSendError(w, err)
+		return
+	}
+	if err := s.sendToTargets(h, req.Phone, req.IsGroup, msg); err != nil {
+		writeSendError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusCreated, map[string]any{"status": "success"})
+}
+
+func (s *Server) sendMediaMultipart(w http.ResponseWriter, r *http.Request) {
+	h, ok := s.connected(w, chi.URLParam(r, "session"))
+	if !ok {
+		return
+	}
+	if err := r.ParseMultipartForm(32 << 20); err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]any{"status": "error", "message": "invalid multipart"})
+		return
+	}
+	file, header, err := r.FormFile("file")
+	if err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]any{"status": "error", "message": "file is required"})
+		return
+	}
+	defer file.Close()
+	data, err := io.ReadAll(file)
+	if err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]any{"status": "error", "message": "cannot read file"})
 		return
 	}
 
-	jid := userJID(req.Phone)
-	if req.IsGroup {
-		jid = types.NewJID(strings.Split(req.Phone, "@")[0], types.GroupServer)
+	mimetype := r.FormValue("mimetype")
+	if mimetype == "" && header != nil {
+		mimetype = header.Header.Get("Content-Type")
 	}
-	mimetype := "image/jpeg"
-	msg := &waE2E.Message{ImageMessage: &waE2E.ImageMessage{
-		Caption:       &req.Caption,
-		Mimetype:      &mimetype,
-		URL:           &uploaded.URL,
-		DirectPath:    &uploaded.DirectPath,
-		MediaKey:      uploaded.MediaKey,
-		FileEncSHA256: uploaded.FileEncSHA256,
-		FileSHA256:    uploaded.FileSHA256,
-		FileLength:    &uploaded.FileLength,
-	}}
-	if _, err := h.Client.SendMessage(ctx, jid, msg); err != nil {
-		writeJSON(w, http.StatusInternalServerError, map[string]any{"status": "error", "message": err.Error()})
+	if mimetype == "" {
+		mimetype = "application/octet-stream"
+	}
+	filename := r.FormValue("filename")
+	if filename == "" && header != nil {
+		filename = header.Filename
+	}
+	msg, err := s.buildMediaMessage(h, data, "", mimetype, filename, r.FormValue("caption"), false)
+	if err != nil {
+		writeSendError(w, err)
+		return
+	}
+	isGroup := strings.EqualFold(r.FormValue("isGroup"), "true")
+	if err := s.sendToTargets(h, r.FormValue("phone"), isGroup, msg); err != nil {
+		writeSendError(w, err)
 		return
 	}
 	writeJSON(w, http.StatusCreated, map[string]any{"status": "success"})
@@ -349,6 +472,171 @@ func (s *Server) allGroups(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{"status": "success", "response": out})
 }
 
+func (s *Server) groupMembers(w http.ResponseWriter, r *http.Request) {
+	s.groupInfo(w, r, "members")
+}
+
+func (s *Server) groupInfo(w http.ResponseWriter, r *http.Request, mode string) {
+	h, ok := s.connected(w, chi.URLParam(r, "session"))
+	if !ok {
+		return
+	}
+	groupID := firstNonEmpty(chi.URLParam(r, "groupId"), chi.URLParam(r, "id"))
+	if groupID == "" {
+		writeJSON(w, http.StatusBadRequest, map[string]any{"status": "error", "message": "groupId is required"})
+		return
+	}
+	info, err := h.Client.GetGroupInfo(context.Background(), groupJID(groupID))
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]any{"status": "error", "message": err.Error()})
+		return
+	}
+	switch mode {
+	case "members":
+		writeJSON(w, http.StatusOK, map[string]any{"status": "success", "response": serializeParticipants(info.Participants, false)})
+	case "memberIDs":
+		writeJSON(w, http.StatusOK, map[string]any{"status": "success", "response": participantIDs(info.Participants, false)})
+	case "admins":
+		writeJSON(w, http.StatusOK, map[string]any{"status": "success", "response": serializeParticipants(info.Participants, true)})
+	default:
+		writeJSON(w, http.StatusOK, map[string]any{"status": "success", "response": serializeGroup(info)})
+	}
+}
+
+type createGroupReq struct {
+	Name         string `json:"name"`
+	Subject      string `json:"subject"`
+	GroupName    string `json:"groupName"`
+	Participants any    `json:"participants"`
+}
+
+func (s *Server) createGroup(w http.ResponseWriter, r *http.Request) {
+	h, ok := s.connected(w, chi.URLParam(r, "session"))
+	if !ok {
+		return
+	}
+	var req createGroupReq
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]any{"status": "error", "message": "invalid json"})
+		return
+	}
+	name := firstNonEmpty(req.Name, req.Subject, req.GroupName)
+	if name == "" {
+		writeJSON(w, http.StatusBadRequest, map[string]any{"status": "error", "message": "name is required"})
+		return
+	}
+	participants := make([]types.JID, 0)
+	for _, phone := range toList(req.Participants) {
+		participants = append(participants, userJID(phone))
+	}
+	info, err := h.Client.CreateGroup(context.Background(), whatsmeow.ReqCreateGroup{
+		Name:         name,
+		Participants: participants,
+	})
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]any{"status": "error", "message": err.Error()})
+		return
+	}
+	writeJSON(w, http.StatusCreated, map[string]any{"status": "success", "response": serializeGroup(info)})
+}
+
+type groupActionReq struct {
+	GroupID      string `json:"groupId"`
+	ID           string `json:"id"`
+	Participants any    `json:"participants"`
+	Phones       any    `json:"phones"`
+	Phone        any    `json:"phone"`
+	Title        string `json:"title"`
+	Name         string `json:"name"`
+	Subject      string `json:"subject"`
+	Description  string `json:"description"`
+}
+
+func (s *Server) leaveGroup(w http.ResponseWriter, r *http.Request) {
+	h, req, ok := s.groupActionRequest(w, r)
+	if !ok {
+		return
+	}
+	if err := h.Client.LeaveGroup(context.Background(), groupJID(firstNonEmpty(req.GroupID, req.ID))); err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]any{"status": "error", "message": err.Error()})
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"status": "success"})
+}
+
+func (s *Server) updateGroupParticipants(action whatsmeow.ParticipantChange) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		h, req, ok := s.groupActionRequest(w, r)
+		if !ok {
+			return
+		}
+		participants := make([]types.JID, 0)
+		for _, phone := range toList(firstAny(req.Participants, req.Phones, req.Phone)) {
+			participants = append(participants, userJID(phone))
+		}
+		if len(participants) == 0 {
+			writeJSON(w, http.StatusBadRequest, map[string]any{"status": "error", "message": "participants is required"})
+			return
+		}
+		resp, err := h.Client.UpdateGroupParticipants(context.Background(), groupJID(firstNonEmpty(req.GroupID, req.ID)), participants, action)
+		if err != nil {
+			writeJSON(w, http.StatusInternalServerError, map[string]any{"status": "error", "message": err.Error()})
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"status": "success", "response": serializeParticipants(resp, false)})
+	}
+}
+
+func (s *Server) setGroupSubject(w http.ResponseWriter, r *http.Request) {
+	h, req, ok := s.groupActionRequest(w, r)
+	if !ok {
+		return
+	}
+	subject := firstNonEmpty(req.Subject, req.Title, req.Name)
+	if subject == "" {
+		writeJSON(w, http.StatusBadRequest, map[string]any{"status": "error", "message": "subject is required"})
+		return
+	}
+	if err := h.Client.SetGroupName(context.Background(), groupJID(firstNonEmpty(req.GroupID, req.ID)), subject); err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]any{"status": "error", "message": err.Error()})
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"status": "success"})
+}
+
+func (s *Server) setGroupDescription(w http.ResponseWriter, r *http.Request) {
+	h, req, ok := s.groupActionRequest(w, r)
+	if !ok {
+		return
+	}
+	if req.Description == "" {
+		writeJSON(w, http.StatusBadRequest, map[string]any{"status": "error", "message": "description is required"})
+		return
+	}
+	if err := h.Client.SetGroupDescription(context.Background(), groupJID(firstNonEmpty(req.GroupID, req.ID)), req.Description); err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]any{"status": "error", "message": err.Error()})
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"status": "success"})
+}
+
+func (s *Server) groupActionRequest(w http.ResponseWriter, r *http.Request) (*session.Handle, groupActionReq, bool) {
+	h, ok := s.connected(w, chi.URLParam(r, "session"))
+	if !ok {
+		return nil, groupActionReq{}, false
+	}
+	var req groupActionReq
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]any{"status": "error", "message": "invalid json"})
+		return nil, groupActionReq{}, false
+	}
+	if firstNonEmpty(req.GroupID, req.ID) == "" {
+		writeJSON(w, http.StatusBadRequest, map[string]any{"status": "error", "message": "groupId is required"})
+		return nil, groupActionReq{}, false
+	}
+	return h, req, true
+}
+
 func (s *Server) dashboardStats(w http.ResponseWriter, _ *http.Request) {
 	handles := s.mgr.List()
 	sessions := make([]map[string]any, 0, len(handles))
@@ -394,6 +682,184 @@ func (s *Server) notSupported(capability string) http.HandlerFunc {
 	}
 }
 
+func (s *Server) sendToTargets(h *session.Handle, phones any, isGroup bool, msg *waE2E.Message) error {
+	targets := toList(phones)
+	if len(targets) == 0 {
+		return errors.New("phone is required")
+	}
+	for _, phone := range targets {
+		if _, err := h.Client.SendMessage(context.Background(), chatJID(phone, isGroup), msg); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (s *Server) buildMediaMessage(h *session.Handle, data []byte, forcedType whatsmeow.MediaType, mimetype, filename, caption string, ptt bool) (*waE2E.Message, error) {
+	if len(data) == 0 {
+		return nil, errors.New("base64/file is required")
+	}
+	mediaType := forcedType
+	if mediaType == "" {
+		mediaType = mediaTypeFromMime(mimetype)
+	}
+	uploaded, err := h.Client.Upload(context.Background(), data, mediaType)
+	if err != nil {
+		return nil, err
+	}
+	switch mediaType {
+	case whatsmeow.MediaImage:
+		return &waE2E.Message{ImageMessage: &waE2E.ImageMessage{
+			Caption:       strPtr(caption),
+			Mimetype:      strPtr(mimetype),
+			URL:           &uploaded.URL,
+			DirectPath:    &uploaded.DirectPath,
+			MediaKey:      uploaded.MediaKey,
+			FileEncSHA256: uploaded.FileEncSHA256,
+			FileSHA256:    uploaded.FileSHA256,
+			FileLength:    &uploaded.FileLength,
+		}}, nil
+	case whatsmeow.MediaVideo:
+		return &waE2E.Message{VideoMessage: &waE2E.VideoMessage{
+			Caption:       strPtr(caption),
+			Mimetype:      strPtr(mimetype),
+			URL:           &uploaded.URL,
+			DirectPath:    &uploaded.DirectPath,
+			MediaKey:      uploaded.MediaKey,
+			FileEncSHA256: uploaded.FileEncSHA256,
+			FileSHA256:    uploaded.FileSHA256,
+			FileLength:    &uploaded.FileLength,
+		}}, nil
+	case whatsmeow.MediaAudio:
+		return &waE2E.Message{AudioMessage: &waE2E.AudioMessage{
+			Mimetype:      strPtr(mimetype),
+			URL:           &uploaded.URL,
+			DirectPath:    &uploaded.DirectPath,
+			MediaKey:      uploaded.MediaKey,
+			FileEncSHA256: uploaded.FileEncSHA256,
+			FileSHA256:    uploaded.FileSHA256,
+			FileLength:    &uploaded.FileLength,
+			PTT:           &ptt,
+		}}, nil
+	default:
+		if filename == "" {
+			filename = defaultFilename(mimetype)
+		}
+		return &waE2E.Message{DocumentMessage: &waE2E.DocumentMessage{
+			Caption:       strPtr(caption),
+			Mimetype:      strPtr(mimetype),
+			Title:         strPtr(filename),
+			FileName:      strPtr(filename),
+			URL:           &uploaded.URL,
+			DirectPath:    &uploaded.DirectPath,
+			MediaKey:      uploaded.MediaKey,
+			FileEncSHA256: uploaded.FileEncSHA256,
+			FileSHA256:    uploaded.FileSHA256,
+			FileLength:    &uploaded.FileLength,
+		}}, nil
+	}
+}
+
+func writeSendError(w http.ResponseWriter, err error) {
+	if err == nil {
+		return
+	}
+	code := http.StatusInternalServerError
+	if strings.Contains(err.Error(), "required") || strings.Contains(err.Error(), "invalid") {
+		code = http.StatusBadRequest
+	}
+	writeJSON(w, code, map[string]any{"status": "error", "message": err.Error()})
+}
+
+func decodeBase64Payload(payload string) ([]byte, string, error) {
+	payload = strings.TrimSpace(payload)
+	if payload == "" {
+		return nil, "", errors.New("base64/file is required")
+	}
+	mimetype := ""
+	if i := strings.Index(payload, ","); strings.HasPrefix(payload, "data:") && i >= 0 {
+		meta := strings.TrimPrefix(payload[:i], "data:")
+		if semi := strings.Index(meta, ";"); semi >= 0 {
+			mimetype = meta[:semi]
+		}
+		payload = payload[i+1:]
+	}
+	data, err := base64.StdEncoding.DecodeString(payload)
+	if err != nil {
+		return nil, "", errors.New("invalid base64")
+	}
+	return data, mimetype, nil
+}
+
+func mediaTypeFromMime(mimetype string) whatsmeow.MediaType {
+	switch {
+	case strings.HasPrefix(mimetype, "image/"):
+		return whatsmeow.MediaImage
+	case strings.HasPrefix(mimetype, "video/"):
+		return whatsmeow.MediaVideo
+	case strings.HasPrefix(mimetype, "audio/"):
+		return whatsmeow.MediaAudio
+	default:
+		return whatsmeow.MediaDocument
+	}
+}
+
+func defaultFilename(mimetype string) string {
+	exts, _ := mime.ExtensionsByType(mimetype)
+	if len(exts) > 0 {
+		return "file" + exts[0]
+	}
+	if ext := filepath.Ext(mimetype); ext != "" {
+		return "file" + ext
+	}
+	return "file.bin"
+}
+
+func serializeGroup(g *types.GroupInfo) map[string]any {
+	if g == nil {
+		return map[string]any{}
+	}
+	return map[string]any{
+		"id":                g.JID.String(),
+		"name":              g.Name,
+		"owner":             g.OwnerJID.String(),
+		"creation":          g.GroupCreated,
+		"participants":      serializeParticipants(g.Participants, false),
+		"participantsCount": len(g.Participants),
+		"isAnnounce":        g.IsAnnounce,
+		"isLocked":          g.IsLocked,
+	}
+}
+
+func serializeParticipants(participants []types.GroupParticipant, adminsOnly bool) []map[string]any {
+	out := make([]map[string]any, 0, len(participants))
+	for _, p := range participants {
+		if adminsOnly && !p.IsAdmin && !p.IsSuperAdmin {
+			continue
+		}
+		out = append(out, map[string]any{
+			"id":           p.JID.String(),
+			"phoneNumber":  p.PhoneNumber.String(),
+			"isAdmin":      p.IsAdmin,
+			"isSuperAdmin": p.IsSuperAdmin,
+			"displayName":  p.DisplayName,
+			"error":        p.Error,
+		})
+	}
+	return out
+}
+
+func participantIDs(participants []types.GroupParticipant, adminsOnly bool) []string {
+	out := make([]string, 0, len(participants))
+	for _, p := range participants {
+		if adminsOnly && !p.IsAdmin && !p.IsSuperAdmin {
+			continue
+		}
+		out = append(out, p.JID.String())
+	}
+	return out
+}
+
 func toList(v any) []string {
 	switch t := v.(type) {
 	case string:
@@ -408,6 +874,37 @@ func toList(v any) []string {
 		return out
 	}
 	return nil
+}
+
+func firstAny(values ...any) any {
+	for _, value := range values {
+		switch v := value.(type) {
+		case string:
+			if v != "" {
+				return value
+			}
+		case nil:
+		default:
+			return value
+		}
+	}
+	return nil
+}
+
+func firstNonEmpty(values ...string) string {
+	for _, value := range values {
+		if strings.TrimSpace(value) != "" {
+			return value
+		}
+	}
+	return ""
+}
+
+func strPtr(value string) *string {
+	if value == "" {
+		return nil
+	}
+	return &value
 }
 
 func writeJSON(w http.ResponseWriter, status int, body any) {
