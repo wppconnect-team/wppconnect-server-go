@@ -22,6 +22,7 @@ import (
 	"go.mau.fi/whatsmeow"
 	"go.mau.fi/whatsmeow/proto/waE2E"
 	"go.mau.fi/whatsmeow/types"
+	"go.mau.fi/whatsmeow/types/events"
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -637,6 +638,196 @@ func (s *Server) groupActionRequest(w http.ResponseWriter, r *http.Request) (*se
 	return h, req, true
 }
 
+type phoneReq struct {
+	Phone   any    `json:"phone"`
+	Number  any    `json:"number"`
+	ID      any    `json:"id"`
+	State   string `json:"state"`
+	Status  string `json:"status"`
+	Online  *bool  `json:"online"`
+	IsGroup bool   `json:"isGroup"`
+}
+
+func (s *Server) subscribePresence(w http.ResponseWriter, r *http.Request) {
+	h, req, ok := s.phoneRequest(w, r)
+	if !ok {
+		return
+	}
+	for _, phone := range toList(firstAny(req.Phone, req.Number, req.ID)) {
+		if err := h.Client.SubscribePresence(context.Background(), chatJID(phone, req.IsGroup)); err != nil {
+			writeJSON(w, http.StatusInternalServerError, map[string]any{"status": "error", "message": err.Error()})
+			return
+		}
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"status": "success"})
+}
+
+func (s *Server) setOnlinePresence(w http.ResponseWriter, r *http.Request) {
+	h, req, ok := s.phoneRequest(w, r)
+	if !ok {
+		return
+	}
+	state := types.PresenceAvailable
+	if req.Online != nil && !*req.Online {
+		state = types.PresenceUnavailable
+	}
+	if strings.EqualFold(req.State, "unavailable") || strings.EqualFold(req.Status, "unavailable") {
+		state = types.PresenceUnavailable
+	}
+	if err := h.Client.SendPresence(context.Background(), state); err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]any{"status": "error", "message": err.Error()})
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"status": "success"})
+}
+
+func (s *Server) sendChatPresence(state types.ChatPresence, media types.ChatPresenceMedia) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		h, req, ok := s.phoneRequest(w, r)
+		if !ok {
+			return
+		}
+		phones := toList(firstAny(req.Phone, req.Number, req.ID))
+		if len(phones) == 0 {
+			writeJSON(w, http.StatusBadRequest, map[string]any{"status": "error", "message": "phone is required"})
+			return
+		}
+		for _, phone := range phones {
+			if err := h.Client.SendChatPresence(context.Background(), chatJID(phone, req.IsGroup), state, media); err != nil {
+				writeJSON(w, http.StatusInternalServerError, map[string]any{"status": "error", "message": err.Error()})
+				return
+			}
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"status": "success"})
+	}
+}
+
+func (s *Server) contactInfo(w http.ResponseWriter, r *http.Request) {
+	h, ok := s.connected(w, chi.URLParam(r, "session"))
+	if !ok {
+		return
+	}
+	phone := chi.URLParam(r, "phone")
+	info, err := h.Client.GetUserInfo(context.Background(), []types.JID{userJID(phone)})
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]any{"status": "error", "message": err.Error()})
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"status": "success", "response": serializeUserInfo(info)})
+}
+
+func (s *Server) profilePicture(w http.ResponseWriter, r *http.Request) {
+	h, ok := s.connected(w, chi.URLParam(r, "session"))
+	if !ok {
+		return
+	}
+	pic, err := h.Client.GetProfilePictureInfo(context.Background(), userJID(chi.URLParam(r, "phone")), nil)
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]any{"status": "error", "message": err.Error()})
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"status": "success", "response": pic})
+}
+
+func (s *Server) profileStatus(w http.ResponseWriter, r *http.Request) {
+	if r.Method == http.MethodPost {
+		s.setProfileStatus(w, r)
+		return
+	}
+	s.contactInfo(w, r)
+}
+
+func (s *Server) setProfileStatus(w http.ResponseWriter, r *http.Request) {
+	h, ok := s.connected(w, chi.URLParam(r, "session"))
+	if !ok {
+		return
+	}
+	var req struct {
+		Status  string `json:"status"`
+		Message string `json:"message"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]any{"status": "error", "message": "invalid json"})
+		return
+	}
+	status := firstNonEmpty(req.Status, req.Message)
+	if status == "" {
+		writeJSON(w, http.StatusBadRequest, map[string]any{"status": "error", "message": "status is required"})
+		return
+	}
+	if err := h.Client.SetStatusMessage(context.Background(), status); err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]any{"status": "error", "message": err.Error()})
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"status": "success"})
+}
+
+func (s *Server) blocklist(w http.ResponseWriter, r *http.Request) {
+	h, ok := s.connected(w, chi.URLParam(r, "session"))
+	if !ok {
+		return
+	}
+	list, err := h.Client.GetBlocklist(context.Background())
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]any{"status": "error", "message": err.Error()})
+		return
+	}
+	items := make([]string, 0, len(list.JIDs))
+	for _, jid := range list.JIDs {
+		items = append(items, jid.String())
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"status": "success", "response": items, "dhash": list.DHash})
+}
+
+func (s *Server) updateBlocklist(action events.BlocklistChangeAction) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		h, req, ok := s.phoneRequest(w, r)
+		if !ok {
+			return
+		}
+		phones := toList(firstAny(req.Phone, req.Number, req.ID))
+		if len(phones) == 0 {
+			writeJSON(w, http.StatusBadRequest, map[string]any{"status": "error", "message": "phone is required"})
+			return
+		}
+		var list *types.Blocklist
+		var err error
+		for _, phone := range phones {
+			list, err = h.Client.UpdateBlocklist(context.Background(), userJID(phone), action)
+			if err != nil {
+				writeJSON(w, http.StatusInternalServerError, map[string]any{"status": "error", "message": err.Error()})
+				return
+			}
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"status": "success", "response": list})
+	}
+}
+
+func (s *Server) ownPhoneNumber(w http.ResponseWriter, r *http.Request) {
+	h, ok := s.connected(w, chi.URLParam(r, "session"))
+	if !ok {
+		return
+	}
+	if h.Client.Store.ID == nil {
+		writeJSON(w, http.StatusOK, map[string]any{"status": "success", "response": ""})
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"status": "success", "response": h.Client.Store.ID.String()})
+}
+
+func (s *Server) phoneRequest(w http.ResponseWriter, r *http.Request) (*session.Handle, phoneReq, bool) {
+	h, ok := s.connected(w, chi.URLParam(r, "session"))
+	if !ok {
+		return nil, phoneReq{}, false
+	}
+	var req phoneReq
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil && r.Body != http.NoBody {
+		writeJSON(w, http.StatusBadRequest, map[string]any{"status": "error", "message": "invalid json"})
+		return nil, phoneReq{}, false
+	}
+	return h, req, true
+}
+
 func (s *Server) dashboardStats(w http.ResponseWriter, _ *http.Request) {
 	handles := s.mgr.List()
 	sessions := make([]map[string]any, 0, len(handles))
@@ -829,6 +1020,28 @@ func serializeGroup(g *types.GroupInfo) map[string]any {
 		"isAnnounce":        g.IsAnnounce,
 		"isLocked":          g.IsLocked,
 	}
+}
+
+func serializeUserInfo(info map[types.JID]types.UserInfo) map[string]any {
+	out := make(map[string]any, len(info))
+	for jid, user := range info {
+		item := map[string]any{
+			"id":        jid.String(),
+			"status":    user.Status,
+			"pictureId": user.PictureID,
+			"lid":       user.LID.String(),
+		}
+		if user.VerifiedName != nil && user.VerifiedName.Details != nil {
+			item["verifiedName"] = user.VerifiedName.Details.GetVerifiedName()
+		}
+		devices := make([]string, 0, len(user.Devices))
+		for _, device := range user.Devices {
+			devices = append(devices, device.String())
+		}
+		item["devices"] = devices
+		out[jid.String()] = item
+	}
+	return out
 }
 
 func serializeParticipants(participants []types.GroupParticipant, adminsOnly bool) []map[string]any {

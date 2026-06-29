@@ -108,6 +108,13 @@ func TestFunctionalCompatibilityRoutesDoNotReturnNotSupported(t *testing.T) {
 		{http.MethodGet, "/api/demo/group-info/123@g.us", ``},
 		{http.MethodGet, "/api/demo/group-admins/123@g.us", ``},
 		{http.MethodGet, "/api/demo/group-members-ids/123@g.us", ``},
+		{http.MethodPost, "/api/demo/subscribe-presence", `{"phone":"5511999999999"}`},
+		{http.MethodPost, "/api/demo/set-online-presence", `{"online":true}`},
+		{http.MethodGet, "/api/demo/contact/5511999999999", ``},
+		{http.MethodGet, "/api/demo/profile-pic/5511999999999", ``},
+		{http.MethodGet, "/api/demo/blocklist", ``},
+		{http.MethodPost, "/api/demo/block-contact", `{"phone":"5511999999999"}`},
+		{http.MethodGet, "/api/demo/get-phone-number", ``},
 	}
 
 	for _, tt := range tests {

@@ -7,6 +7,8 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"go.mau.fi/whatsmeow"
+	"go.mau.fi/whatsmeow/types"
+	"go.mau.fi/whatsmeow/types/events"
 )
 
 type compatibilityRoute struct {
@@ -173,6 +175,10 @@ func (s *Server) compatibilityHandler(route compatibilityRoute) http.HandlerFunc
 	switch route.path {
 	case "/api/{session}/check-connection-session":
 		return s.statusSession
+	case "/api/{session}/subscribe-presence":
+		return s.subscribePresence
+	case "/api/{session}/set-online-presence":
+		return s.setOnlinePresence
 	case "/api/{session}/send-file":
 		return s.sendFile
 	case "/api/{session}/send-voice", "/api/{session}/send-voice-base64":
@@ -197,6 +203,26 @@ func (s *Server) compatibilityHandler(route compatibilityRoute) http.HandlerFunc
 		return s.setGroupSubject
 	case "/api/{session}/group-description":
 		return s.setGroupDescription
+	case "/api/{session}/contact/{phone}", "/api/{session}/profile/{phone}", "/api/{session}/profile-status/{phone}":
+		return s.contactInfo
+	case "/api/{session}/profile-pic/{phone}":
+		return s.profilePicture
+	case "/api/{session}/profile-status":
+		return s.profileStatus
+	case "/api/{session}/blocklist":
+		return s.blocklist
+	case "/api/{session}/block-contact":
+		return s.updateBlocklist(events.BlocklistChangeActionBlock)
+	case "/api/{session}/unblock-contact":
+		return s.updateBlocklist(events.BlocklistChangeActionUnblock)
+	case "/api/{session}/get-phone-number":
+		return s.ownPhoneNumber
+	case "/api/{session}/typing":
+		return s.sendChatPresence(types.ChatPresenceComposing, types.ChatPresenceMediaText)
+	case "/api/{session}/recording":
+		return s.sendChatPresence(types.ChatPresenceComposing, types.ChatPresenceMediaAudio)
+	case "/api/{session}/chat-state":
+		return s.sendChatPresence(types.ChatPresencePaused, types.ChatPresenceMediaText)
 	default:
 		return s.notSupported(route.capability)
 	}
