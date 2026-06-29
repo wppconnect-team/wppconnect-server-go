@@ -61,6 +61,8 @@ func NewRouter(cfg config.Config, mgr *session.Manager) http.Handler {
 		protected.Get("/api/{session}/all-groups", s.allGroups)
 		protected.Get("/api/{session}/group-members/{groupId}", s.notSupported("groups"))
 		protected.Post("/api/{session}/create-group", s.notSupported("groups"))
+
+		s.registerNodeCompatibilityRoutes(r, protected)
 	})
 
 	return r
@@ -379,11 +381,14 @@ func (s *Server) dashboardStats(w http.ResponseWriter, _ *http.Request) {
 }
 
 func (s *Server) notSupported(capability string) http.HandlerFunc {
-	return func(w http.ResponseWriter, _ *http.Request) {
+	return func(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusNotImplemented, map[string]any{
 			"status":     "not_supported",
+			"runtime":    "wppconnect-server-go",
 			"provider":   "whatsmeow",
 			"capability": capability,
+			"method":     r.Method,
+			"route":      r.URL.Path,
 			"message":    "Capability is not supported by wppconnect-server-go yet.",
 		})
 	}
