@@ -1,5 +1,9 @@
 # wppconnect-server-go
 
+[![Docker Pulls](https://img.shields.io/docker/pulls/wppconnect/wppconnect-server-go?logo=docker)](https://hub.docker.com/r/wppconnect/wppconnect-server-go)
+[![Docker Image Version](https://img.shields.io/docker/v/wppconnect/wppconnect-server-go?sort=semver&logo=docker)](https://hub.docker.com/r/wppconnect/wppconnect-server-go/tags)
+[![GitHub Release](https://img.shields.io/github/v/release/wppconnect-team/wppconnect-server-go)](https://github.com/wppconnect-team/wppconnect-server-go/releases/latest)
+
 A Go port of [wppconnect-server](https://github.com/wppconnect-team/wppconnect-server),
 backed by [whatsmeow](https://github.com/tulir/whatsmeow) instead of a browser
 (Puppeteer). It keeps the **HTTP contract compatible** with the Node server —
@@ -43,12 +47,55 @@ Payloads match the Node server: `send-message` takes `phone` (string or array),
 `message`, `isGroup`; `send-image` takes `phone`, `base64` (raw or data URL),
 `caption`, `isGroup`; `send-seen` takes `phone`.
 
-## Run
+## Docker (recommended)
+
+The official image is available on
+[Docker Hub](https://hub.docker.com/r/wppconnect/wppconnect-server-go):
+
+```bash
+docker run -d \
+  --name wppconnect-server-go \
+  --restart unless-stopped \
+  -p 21465:21465 \
+  -e SECRET_KEY=change-me \
+  -v wppconnect_go_data:/data \
+  wppconnect/wppconnect-server-go:latest
+```
+
+For Docker Compose, clone the repository and run:
+
+```bash
+SECRET_KEY=change-me docker compose up -d
+docker compose ps
+curl http://localhost:21465/healthz
+```
+
+Set `WPP_SERVER_GO_TAG` to pin a release instead of following `latest`:
+
+```bash
+WPP_SERVER_GO_TAG=0.1 SECRET_KEY=change-me docker compose up -d
+```
+
+Available release tags follow the GitHub version: `vX.Y.Z`, `X.Y.Z`, `X.Y`,
+`X`, and `latest`. Immutable `sha-*` tags are also published for every release.
+See all tags on [Docker Hub](https://hub.docker.com/r/wppconnect/wppconnect-server-go/tags).
+
+The container accepts `PORT`, `SECRET_KEY`, `WEBHOOK_URL`, and `DATA_DIR`.
+The Compose setup stores WhatsApp session data in the `wpp_go_data` volume, so
+sessions survive container upgrades. Change the default secret before exposing
+the API outside your machine.
+
+To upgrade the Compose deployment:
+
+```bash
+docker compose pull
+docker compose up -d
+```
+
+## Run from source
 
 ```bash
 go run ./cmd/server
-# or
-docker compose up --build
 ```
 
 Then start a session and watch the logs for the QR (also delivered via webhook
