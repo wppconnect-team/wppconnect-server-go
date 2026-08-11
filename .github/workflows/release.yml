@@ -1,0 +1,128 @@
+name: Release
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+    inputs:
+      increment:
+        description: 'Version increment'
+        required: true
+        default: patch
+        type: choice
+        options:
+          - patch
+          - minor
+          - major
+          - prerelease
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-main
+  cancel-in-progress: false
+
+jobs:
+  prepare:
+    runs-on: ubuntu-latest
+    outputs:
+      release_tag: ${{ steps.release.outputs.release_tag }}
+      should_release: ${{ steps.release.outputs.should_release }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Determine release
+        id: release
+        shell: bash
+        env:
+          REQUESTED_INCREMENT: ${{ inputs.increment }}
+        run: |
+          increment="${REQUESTED_INCREMENT:-patch}"
+          latest_tag="$(git tag --list 'v[0-9]*' --sort=-version:refname | head -n 1)"
+          should_release=true
+
+          if [[ "$GITHUB_EVENT_NAME" == "push" && -n "$latest_tag" ]] && \
+             git diff --quiet "$latest_tag..HEAD" -- .; then
+            should_release=false
+            echo "No changes since $latest_tag; skipping duplicate release"
+          fi
+
+          if [[ "$should_release" == "false" ]]; then
+            echo "should_release=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          if [[ -z "$latest_tag" ]]; then
+            case "$increment" in
+              major) next_version="1.0.0" ;;
+              prerelease) next_version="0.1.0-rc.0" ;;
+              patch|minor) next_version="0.1.0" ;;
+              *) echo "Unsupported increment: $increment" >&2; exit 1 ;;
+            esac
+          else
+            current="${latest_tag#v}"
+            if [[ ! "$current" =~ ^([0-9]+)\.([0-9]+)\.([0-9]+)(-rc\.([0-9]+))?$ ]]; then
+              echo "Unsupported semantic version tag: $latest_tag" >&2
+              exit 1
+            fi
+
+            major="${BASH_REMATCH[1]}"
+            minor="${BASH_REMATCH[2]}"
+            patch="${BASH_REMATCH[3]}"
+            prerelease_number="${BASH_REMATCH[5]}"
+
+            case "$increment" in
+              patch)
+                if [[ -n "$prerelease_number" ]]; then
+                  next_version="$major.$minor.$patch"
+                else
+                  next_version="$major.$minor.$((patch + 1))"
+                fi
+                ;;
+              minor) next_version="$major.$((minor + 1)).0" ;;
+              major) next_version="$((major + 1)).0.0" ;;
+              prerelease)
+                if [[ -n "$prerelease_number" ]]; then
+                  next_version="$major.$minor.$patch-rc.$((prerelease_number + 1))"
+                else
+                  next_version="$major.$minor.$((patch + 1))-rc.0"
+                fi
+                ;;
+              *) echo "Unsupported increment: $increment" >&2; exit 1 ;;
+            esac
+          fi
+
+          release_tag="v$next_version"
+          if git rev-parse --verify --quiet "refs/tags/$release_tag" >/dev/null; then
+            echo "Tag already exists: $release_tag" >&2
+            exit 1
+          fi
+
+          echo "Latest tag: ${latest_tag:-none}"
+          echo "Next release: $release_tag"
+          echo "release_tag=$release_tag" >> "$GITHUB_OUTPUT"
+          echo "should_release=true" >> "$GITHUB_OUTPUT"
+
+      - name: Create and push tag
+        if: steps.release.outputs.should_release == 'true'
+        env:
+          RELEASE_TAG: ${{ steps.release.outputs.release_tag }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag --annotate "$RELEASE_TAG" --message "chore(release): $RELEASE_TAG"
+          git push origin "refs/tags/$RELEASE_TAG"
+
+  docker:
+    needs: prepare
+    if: needs.prepare.outputs.should_release == 'true'
+    uses: ./.github/workflows/docker.yml
+    with:
+      release_tag: ${{ needs.prepare.outputs.release_tag }}
+    secrets: inherit
