@@ -99,7 +99,7 @@ func cleanSession(name string) string {
 // standard "disconnected" response and returns false.
 func (s *Server) connected(w http.ResponseWriter, name string) (*session.Handle, bool) {
 	h, ok := s.mgr.Get(cleanSession(name))
-	if !ok || h.Status != session.StatusConnected {
+	if !ok || h.GetStatus() != session.StatusConnected {
 		writeJSON(w, http.StatusNotFound, map[string]any{
 			"status": "disconnected", "session": cleanSession(name),
 		})
@@ -123,7 +123,7 @@ func (s *Server) startSession(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]any{
-		"status": string(h.Status), "session": name, "qrcode": h.QRCode,
+		"status": string(h.GetStatus()), "session": name, "qrcode": h.GetQRCode(),
 	})
 }
 
@@ -135,21 +135,25 @@ func (s *Server) statusSession(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]any{
-		"status": string(h.Status), "session": name, "urlcode": h.QRCode,
+		"status": string(h.GetStatus()), "session": name, "urlcode": h.GetQRCode(),
 	})
 }
 
 func (s *Server) qrcodeSession(w http.ResponseWriter, r *http.Request) {
 	name := cleanSession(chi.URLParam(r, "session"))
 	h, ok := s.mgr.Get(name)
-	if !ok || h.QRCode == "" {
+	qrCode := ""
+	if ok {
+		qrCode = h.GetQRCode()
+	}
+	if !ok || qrCode == "" {
 		writeJSON(w, http.StatusOK, map[string]any{
 			"status":  "QRCODE_NOT_AVAILABLE",
 			"message": "QRCode is not available...",
 		})
 		return
 	}
-	png, err := qrcode.Encode(h.QRCode, qrcode.Medium, 500)
+	png, err := qrcode.Encode(qrCode, qrcode.Medium, 500)
 	if err != nil {
 		writeJSON(w, http.StatusInternalServerError, map[string]any{"status": "error", "message": err.Error()})
 		return
@@ -168,7 +172,7 @@ type sendMessageReq struct {
 func (s *Server) sendMessage(w http.ResponseWriter, r *http.Request) {
 	name := cleanSession(chi.URLParam(r, "session"))
 	h, ok := s.mgr.Get(name)
-	if !ok || h.Status != session.StatusConnected {
+	if !ok || h.GetStatus() != session.StatusConnected {
 		writeJSON(w, http.StatusNotFound, map[string]any{
 			"status": "disconnected", "session": name,
 		})
@@ -350,7 +354,8 @@ func (s *Server) dashboardStats(w http.ResponseWriter, _ *http.Request) {
 	sessions := make([]map[string]any, 0, len(handles))
 	connected := 0
 	for _, h := range handles {
-		if h.Status == session.StatusConnected {
+		status := h.GetStatus()
+		if status == session.StatusConnected {
 			connected++
 		}
 		sessions = append(sessions, map[string]any{
@@ -358,8 +363,8 @@ func (s *Server) dashboardStats(w http.ResponseWriter, _ *http.Request) {
 			"origin":    "unknown",
 			"runtime":   "wppconnect-server-go",
 			"provider":  "whatsmeow",
-			"status":    h.Status,
-			"connected": h.Status == session.StatusConnected,
+			"status":    status,
+			"connected": status == session.StatusConnected,
 		})
 	}
 	writeJSON(w, http.StatusOK, map[string]any{

@@ -31,11 +31,47 @@ const (
 
 // Handle is the Go counterpart of the Node SessionHandle: it owns one
 // whatsmeow client plus the session's current status and last QR code.
+//
+// Status and QRCode are written concurrently by the event-handler goroutine
+// (events.Connected) and the QR-forwarding goroutine (GetQRChannel), while
+// being read from HTTP handler goroutines via GetStatus/GetQRCode. mu guards
+// both fields; Name and Client are set once before the handle is published
+// and never mutated afterwards, so they can be read without holding mu.
 type Handle struct {
 	Name   string
 	Client *whatsmeow.Client
-	Status Status
-	QRCode string
+
+	mu     sync.RWMutex
+	status Status
+	qrCode string
+}
+
+// GetStatus returns the handle's current status.
+func (h *Handle) GetStatus() Status {
+	h.mu.RLock()
+	defer h.mu.RUnlock()
+	return h.status
+}
+
+// SetStatus updates the handle's current status.
+func (h *Handle) SetStatus(s Status) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	h.status = s
+}
+
+// GetQRCode returns the handle's last QR code.
+func (h *Handle) GetQRCode() string {
+	h.mu.RLock()
+	defer h.mu.RUnlock()
+	return h.qrCode
+}
+
+// SetQRCode updates the handle's last QR code.
+func (h *Handle) SetQRCode(code string) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	h.qrCode = code
 }
 
 // EventSink receives normalized session events (QR, message, connection). The
@@ -128,14 +164,25 @@ func (m *Manager) Start(ctx context.Context, name string) (*Handle, error) {
 	}
 
 	client := whatsmeow.NewClient(deviceStore, m.log)
-	h := &Handle{Name: name, Client: client, Status: StatusInitializing}
+	h := &Handle{Name: name, Client: client, status: StatusInitializing}
 	m.sessions[name] = h
 	m.mu.Unlock()
+
+	// Roll back the just-published handle on any failure below, instead of
+	// leaving a permanently-stuck, half-initialized handle visible via
+	// Get/List — the client never connected, so it can't ever surface a
+	// connection-state change to clear itself out.
+	fail := func(err error) (*Handle, error) {
+		m.mu.Lock()
+		delete(m.sessions, name)
+		m.mu.Unlock()
+		return nil, err
+	}
 
 	client.AddEventHandler(func(evt any) {
 		switch v := evt.(type) {
 		case *events.Connected:
-			h.Status = StatusConnected
+			h.SetStatus(StatusConnected)
 			m.sink.OnConnected(name)
 		case *events.Message:
 			m.sink.OnMessage(name, v)
@@ -146,19 +193,19 @@ func (m *Manager) Start(ctx context.Context, name string) (*Handle, error) {
 		// Not logged in: stream QR codes until the user scans.
 		qrChan, _ := client.GetQRChannel(ctx)
 		if err := client.Connect(); err != nil {
-			return nil, fmt.Errorf("connect: %w", err)
+			return fail(fmt.Errorf("connect: %w", err))
 		}
 		go func() {
 			for evt := range qrChan {
 				if evt.Event == "code" {
-					h.Status = StatusQRCode
-					h.QRCode = evt.Code
+					h.SetStatus(StatusQRCode)
+					h.SetQRCode(evt.Code)
 					m.sink.OnQR(name, evt.Code)
 				}
 			}
 		}()
 	} else if err := client.Connect(); err != nil {
-		return nil, fmt.Errorf("connect: %w", err)
+		return fail(fmt.Errorf("connect: %w", err))
 	}
 
 	return h, nil
@@ -170,7 +217,7 @@ func (m *Manager) Close(name string) {
 	defer m.mu.Unlock()
 	if h, ok := m.sessions[name]; ok {
 		h.Client.Disconnect()
-		h.Status = StatusClosed
+		h.SetStatus(StatusClosed)
 		delete(m.sessions, name)
 	}
 }
