@@ -10,6 +10,8 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+
+	"github.com/google/uuid"
 )
 
 type sessionRecord struct {
@@ -20,7 +22,16 @@ type sessionRecord struct {
 
 func (m *Manager) readRecord(name string) (sessionRecord, error) {
 	record := sessionRecord{Name: name}
-	f, err := os.Open(filepath.Join(m.dataDir, name+".session.json"))
+	if !validName(name) {
+		return record, ErrInvalidName
+	}
+	root, err := os.OpenRoot(m.dataDir)
+	if err != nil {
+		return record, err
+	}
+	defer root.Close()
+	// Root confines resolution even when a valid filename is a symbolic link.
+	f, err := root.Open(name + ".session.json")
 	if errors.Is(err, os.ErrNotExist) {
 		return record, nil
 	}
@@ -45,15 +56,24 @@ func (m *Manager) readRecord(name string) (sessionRecord, error) {
 }
 
 func (m *Manager) writeRecord(record sessionRecord) error {
+	if !validName(record.Name) {
+		return ErrInvalidName
+	}
 	b, err := json.Marshal(record)
 	if err != nil {
 		return err
 	}
-	f, err := os.CreateTemp(m.dataDir, ".session-*.tmp")
+	root, err := os.OpenRoot(m.dataDir)
 	if err != nil {
 		return err
 	}
-	defer os.Remove(f.Name())
+	defer root.Close()
+	tempName := ".session-" + uuid.NewString() + ".tmp"
+	f, err := root.OpenFile(tempName, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0o600)
+	if err != nil {
+		return err
+	}
+	defer root.Remove(tempName)
 	if _, err = f.Write(b); err == nil {
 		err = f.Sync()
 	}
@@ -61,7 +81,7 @@ func (m *Manager) writeRecord(record sessionRecord) error {
 	if err != nil {
 		return err
 	}
-	return os.Rename(f.Name(), filepath.Join(m.dataDir, record.Name+".session.json"))
+	return root.Rename(tempName, record.Name+".session.json")
 }
 
 // Restore migrates legacy paired stores, honoring explicit close/logout records.

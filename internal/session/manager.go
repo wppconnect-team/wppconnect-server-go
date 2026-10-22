@@ -10,7 +10,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
-	"strings"
+	"regexp"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -188,10 +188,13 @@ func (m *Manager) List() []*Handle {
 }
 
 func (m *Manager) openContainer(ctx context.Context, name string) (*sqlstore.Container, error) {
+	if !validName(name) {
+		return nil, ErrInvalidName
+	}
 	if err := os.MkdirAll(m.dataDir, 0o755); err != nil {
 		return nil, err
 	}
-	dbPath := filepath.Join(m.dataDir, safeName(name)+".db")
+	dbPath := filepath.Join(m.dataDir, name+".db")
 	db, err := sql.Open("sqlite", "file:"+filepath.ToSlash(dbPath)+"?_pragma=foreign_keys(1)&_pragma=busy_timeout(5000)")
 	if err != nil {
 		return nil, fmt.Errorf("open store: %w", err)
@@ -205,15 +208,10 @@ func (m *Manager) openContainer(ctx context.Context, name string) (*sqlstore.Con
 	return container, nil
 }
 
-func safeName(name string) string { return name }
+var sessionNamePattern = regexp.MustCompile(`^[A-Za-z0-9_-]{1,64}$`)
 
 func validName(name string) bool {
-	if len(name) == 0 || len(name) > 64 {
-		return false
-	}
-	return strings.IndexFunc(name, func(r rune) bool {
-		return !(r >= 'a' && r <= 'z' || r >= 'A' && r <= 'Z' || r >= '0' && r <= '9' || r == '_' || r == '-')
-	}) < 0
+	return sessionNamePattern.MatchString(name) && filepath.IsLocal(name)
 }
 
 func (m *Manager) openHandle(ctx context.Context, name string) (*Handle, error) {

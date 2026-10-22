@@ -58,6 +58,9 @@ log e não impede a restauração das demais sessões.
 
 Cada `<sessao>.session.json` registra nome, intenção de restauração e revogação.
 O arquivo é escrito via temporário, sync e renomeação, sem chaves ou tokens.
+Leitura e gravação validam o nome novamente na camada de armazenamento e usam
+`os.Root` para manter os registros dentro do `DATA_DIR`, inclusive na presença
+de links simbólicos. Temporários são criados com exclusividade e permissão `0600`.
 Preserve-o junto com `<sessao>.db` e `<sessao>.directory.db` no volume `/data`.
 Não apague os registros de sessões fechadas, pois eles impedem a migração
 legada de reativá-las. Desabilitar restauração mantém os arquivos intactos e
@@ -121,7 +124,9 @@ A estratégia segue a documentação oficial de [builds multiplataforma](https:/
 e [testes antes de publicar](https://docs.docker.com/build/ci/github-actions/test-before-push/).
 O CI carrega e testa cada variante amd64/arm64, incluindo healthcheck positivo
 e negativo, token, OpenAPI, parada limpa e preservação de fechamento após
-reinício. A publicação depende desse job e gera ambas as plataformas.
+reinício. O teste consulta novamente a porta publicada depois de reiniciar,
+pois o Docker pode mudar uma porta aleatória. A publicação depende desse job
+e gera ambas as plataformas.
 
 Para repetir o teste da imagem sem uma conta WhatsApp:
 

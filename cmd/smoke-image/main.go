@@ -37,6 +37,10 @@ func main() {
 	}
 }
 func run(image, platform string) error {
+	return runWithDocker(image, platform, docker)
+}
+
+func runWithDocker(image, platform string, docker func(...string) (string, error)) error {
 	name := fmt.Sprintf("wppgo-smoke-%d", time.Now().UnixNano())
 	volume := name + "-data"
 	if _, err := docker("volume", "create", volume); err != nil {
@@ -51,16 +55,12 @@ func run(image, platform string) error {
 	if _, err := docker("run", "-d", "--name", name, "--platform", platform, "-e", "PORT=21466", "-e", "SECRET_KEY=smoke-secret", "-e", "SHUTDOWN_TIMEOUT=10s", "-p", "127.0.0.1::21466", "-v", volume+":/data", image); err != nil {
 		return err
 	}
-	port, err := docker("port", name, "21466/tcp")
+	base, err := publishedURL(docker, name)
 	if err != nil {
 		return err
 	}
-	_, number, err := net.SplitHostPort(strings.Split(port, "\n")[0])
-	if err != nil {
-		return err
-	}
-	base := "http://127.0.0.1:" + number
 	client := &http.Client{Timeout: 5 * time.Second}
+	defer client.CloseIdleConnections()
 	call := func(method, path, token string) (map[string]any, error) {
 		req, err := http.NewRequest(method, base+path, nil)
 		if err != nil {
@@ -154,6 +154,12 @@ func run(image, platform string) error {
 	if err = healthy(); err != nil {
 		return err
 	}
+	// Docker may assign a different random host port when the container restarts.
+	base, err = publishedURL(docker, name)
+	if err != nil {
+		return err
+	}
+	client.CloseIdleConnections()
 	record, err := docker("exec", name, "cat", "/data/smoke.session.json")
 	if err != nil {
 		return err
@@ -180,4 +186,16 @@ func run(image, platform string) error {
 	}
 	fmt.Printf("Smoke test passed: %s\n", platform)
 	return nil
+}
+
+func publishedURL(docker func(...string) (string, error), name string) (string, error) {
+	port, err := docker("port", name, "21466/tcp")
+	if err != nil {
+		return "", err
+	}
+	_, number, err := net.SplitHostPort(strings.Split(port, "\n")[0])
+	if err != nil {
+		return "", err
+	}
+	return "http://127.0.0.1:" + number, nil
 }
