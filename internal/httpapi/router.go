@@ -5,37 +5,83 @@ package httpapi
 
 import (
 	"context"
-	"encoding/base64"
+	"crypto/subtle"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"strings"
 	"time"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/skip2/go-qrcode"
+	"github.com/wppconnect-team/wppconnect-server-go/internal/auth"
 	"github.com/wppconnect-team/wppconnect-server-go/internal/config"
+	"github.com/wppconnect-team/wppconnect-server-go/internal/directory"
+	"github.com/wppconnect-team/wppconnect-server-go/internal/groups"
+	"github.com/wppconnect-team/wppconnect-server-go/internal/media"
 	"github.com/wppconnect-team/wppconnect-server-go/internal/session"
-	"go.mau.fi/whatsmeow"
 	"go.mau.fi/whatsmeow/proto/waE2E"
 	"go.mau.fi/whatsmeow/types"
-	"golang.org/x/crypto/bcrypt"
 )
 
 // Server wires the routes to the session manager.
 type Server struct {
-	cfg config.Config
-	mgr *session.Manager
+	cfg              config.Config
+	mgr              *session.Manager
+	mediaSession     func(string) (media.Client, *media.Store, bool)
+	mediaSlots       chan struct{}
+	groupSession     func(string) (groups.Client, bool)
+	directorySession func(string) (directory.Client, *directory.State, bool)
 }
 
 // NewRouter builds the chi router with the compatible endpoints.
 func NewRouter(cfg config.Config, mgr *session.Manager) http.Handler {
 	s := &Server{cfg: cfg, mgr: mgr}
+	s.mediaSession = func(name string) (media.Client, *media.Store, bool) {
+		h, ok := mgr.Get(name)
+		if !ok || h.GetStatus() != session.StatusConnected {
+			return nil, nil, false
+		}
+		return h.Client, h.Media, true
+	}
+	s.groupSession = func(name string) (groups.Client, bool) {
+		h, ok := mgr.Get(name)
+		if !ok || h.GetStatus() != session.StatusConnected {
+			return nil, false
+		}
+		return h.Client, true
+	}
+	s.directorySession = func(name string) (directory.Client, *directory.State, bool) {
+		h, ok := mgr.Get(name)
+		if !ok || h.GetStatus() != session.StatusConnected {
+			return nil, nil, false
+		}
+		return directory.SDK{Client: h.Client}, h.Directory, true
+	}
+	return s.router()
+}
+
+func (s *Server) router() http.Handler {
+	s.mediaSlots = make(chan struct{}, 4)
 	r := chi.NewRouter()
+	r.Get("/openapi.json", s.openAPI)
 
 	r.Get("/healthz", func(w http.ResponseWriter, _ *http.Request) {
+		if s.mgr != nil && s.mgr.IsStopping() {
+			w.WriteHeader(http.StatusServiceUnavailable)
+			return
+		}
+		w.WriteHeader(http.StatusOK)
+	})
+	r.Get("/readyz", func(w http.ResponseWriter, _ *http.Request) {
+		if s.mgr != nil && !s.mgr.IsReady() {
+			w.WriteHeader(http.StatusServiceUnavailable)
+			return
+		}
 		w.WriteHeader(http.StatusOK)
 	})
 	r.Get("/api/dashboard/stats", s.dashboardStats)
+	r.Post("/api/{session}/{secretkey}/generate-token", s.generateToken)
 
 	r.Group(func(protected chi.Router) {
 		protected.Use(s.auth)
@@ -48,17 +94,22 @@ func NewRouter(cfg config.Config, mgr *session.Manager) http.Handler {
 		protected.Post("/api/{session}/send-message", s.sendMessage)
 		// Mirrors POST /api/:session/close-session and logout-session
 		protected.Post("/api/{session}/close-session", s.closeSession)
-		protected.Post("/api/{session}/logout-session", s.closeSession)
+		protected.Post("/api/{session}/logout-session", s.logoutSession)
 		// Mirrors POST /api/:session/send-image (base64)
 		protected.Post("/api/{session}/send-image", s.sendImage)
+		protected.Post("/api/{session}/send-file", s.sendFile)
+		protected.Post("/api/{session}/send-file-base64", s.sendFile)
+		protected.Post("/api/{session}/send-voice-base64", s.sendVoice)
+		protected.Post("/api/{session}/send-voice", s.sendVoice)
+		protected.Post("/api/{session}/send-audio-base64", s.sendAudio)
+		protected.Post("/api/{session}/download-media", s.downloadMedia)
+		protected.Get("/api/{session}/get-media-by-message/{messageId}", s.downloadMedia)
 		// Mirrors POST /api/:session/send-seen
 		protected.Post("/api/{session}/send-seen", s.sendSeen)
 		// Mirrors GET /api/:session/check-number-status/:phone
 		protected.Get("/api/{session}/check-number-status/{phone}", s.checkNumber)
-		// Mirrors GET /api/:session/all-groups
-		protected.Get("/api/{session}/all-groups", s.allGroups)
-		protected.Get("/api/{session}/group-members/{groupId}", s.notSupported("groups"))
-		protected.Post("/api/{session}/create-group", s.notSupported("groups"))
+		s.groupRoutes(protected)
+		s.directoryRoutes(protected)
 	})
 
 	return r
@@ -66,10 +117,12 @@ func NewRouter(cfg config.Config, mgr *session.Manager) http.Handler {
 
 func (s *Server) auth(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		sessionName := cleanSession(chi.URLParam(r, "session"))
-		auth := r.Header.Get("Authorization")
+		sessionParam := chi.URLParam(r, "session")
+		sessionName := cleanSession(sessionParam)
 		token := ""
-		if parts := strings.SplitN(auth, " ", 2); len(parts) == 2 {
+		if parts := strings.SplitN(sessionParam, ":", 2); len(parts) == 2 {
+			token = parts[1]
+		} else if parts := strings.Fields(r.Header.Get("Authorization")); len(parts) == 2 && strings.EqualFold(parts[0], "Bearer") {
 			token = parts[1]
 		}
 		if token == "" {
@@ -78,13 +131,39 @@ func (s *Server) auth(next http.Handler) http.Handler {
 			})
 			return
 		}
-		if err := bcrypt.CompareHashAndPassword([]byte(token), []byte(sessionName+s.cfg.SecretKey)); err != nil {
+		if err := auth.Verify(sessionName, s.cfg.SecretKey, token); err != nil {
 			writeJSON(w, http.StatusUnauthorized, map[string]any{
 				"error": "Check that the Session and Token are correct",
 			})
 			return
 		}
 		next.ServeHTTP(w, r)
+	})
+}
+
+// generateToken mirrors the Node server's secret-key bootstrap endpoint.
+func (s *Server) generateToken(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Cache-Control", "no-store")
+	if subtle.ConstantTimeCompare([]byte(chi.URLParam(r, "secretkey")), []byte(s.cfg.SecretKey)) != 1 {
+		writeJSON(w, http.StatusBadRequest, map[string]any{
+			"response": false, "message": "The SECRET_KEY is incorrect",
+		})
+		return
+	}
+	name := chi.URLParam(r, "session")
+	if name == "" || strings.Contains(name, ":") || len(name+s.cfg.SecretKey) > 72 {
+		writeJSON(w, http.StatusBadRequest, map[string]any{
+			"status": "error", "message": "session must not contain ':' and session + SECRET_KEY must fit in 72 bytes",
+		})
+		return
+	}
+	token, err := auth.Generate(name, s.cfg.SecretKey)
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]any{"status": "error", "message": "could not generate token"})
+		return
+	}
+	writeJSON(w, http.StatusCreated, map[string]any{
+		"status": "success", "session": name, "token": token, "full": name + ":" + token,
 	})
 }
 
@@ -115,11 +194,9 @@ func userJID(phone string) types.JID {
 
 func (s *Server) startSession(w http.ResponseWriter, r *http.Request) {
 	name := cleanSession(chi.URLParam(r, "session"))
-	h, err := s.mgr.Start(context.Background(), name)
+	h, err := s.mgr.Start(r.Context(), name)
 	if err != nil {
-		writeJSON(w, http.StatusInternalServerError, map[string]any{
-			"status": "error", "message": err.Error(),
-		})
+		lifecycleError(w, err)
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]any{
@@ -190,7 +267,7 @@ func (s *Server) sendMessage(w http.ResponseWriter, r *http.Request) {
 		if req.IsGroup {
 			jid = types.NewJID(phone, types.GroupServer)
 		}
-		_, err := h.Client.SendMessage(context.Background(), jid, &waE2E.Message{
+		resp, err := h.Client.SendMessage(r.Context(), jid, &waE2E.Message{
 			Conversation: &req.Message,
 		})
 		if err != nil {
@@ -199,74 +276,46 @@ func (s *Server) sendMessage(w http.ResponseWriter, r *http.Request) {
 			})
 			return
 		}
+		s.observeSent(name, jid, resp.ID, resp.Timestamp)
 	}
 	writeJSON(w, http.StatusCreated, map[string]any{"status": "success"})
 }
 
 func (s *Server) closeSession(w http.ResponseWriter, r *http.Request) {
 	name := cleanSession(chi.URLParam(r, "session"))
-	s.mgr.Close(name)
+	if err := s.mgr.Close(name); err != nil {
+		lifecycleError(w, err)
+		return
+	}
 	writeJSON(w, http.StatusOK, map[string]any{"status": "success", "session": name})
 }
 
-type sendImageReq struct {
-	Phone   string `json:"phone"`
-	Base64  string `json:"base64"`
-	Caption string `json:"caption"`
-	IsGroup bool   `json:"isGroup"`
+func (s *Server) logoutSession(w http.ResponseWriter, r *http.Request) {
+	name := cleanSession(chi.URLParam(r, "session"))
+	ctx, cancel := context.WithTimeout(r.Context(), 30*time.Second)
+	defer cancel()
+	if err := s.mgr.Logout(ctx, name); err != nil {
+		lifecycleError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"status": "success", "session": name})
 }
 
-// sendImage uploads a base64 image and sends it. Mirrors POST send-image (the
-// base64 variant of the Node server).
-func (s *Server) sendImage(w http.ResponseWriter, r *http.Request) {
-	h, ok := s.connected(w, chi.URLParam(r, "session"))
-	if !ok {
-		return
+func lifecycleError(w http.ResponseWriter, err error) {
+	code, message := http.StatusBadGateway, "session operation failed"
+	switch {
+	case errors.Is(err, session.ErrInvalidName):
+		code, message = 400, err.Error()
+	case errors.Is(err, session.ErrStopping):
+		code, message = 503, "server is shutting down"
+	case errors.Is(err, session.ErrDisconnected):
+		code, message = 409, err.Error()
+	case errors.Is(err, context.DeadlineExceeded):
+		code, message = 504, "session operation timed out"
+	case errors.Is(err, context.Canceled):
+		code, message = 503, "session operation canceled"
 	}
-	var req sendImageReq
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.Base64 == "" {
-		writeJSON(w, http.StatusBadRequest, map[string]any{"status": "error"})
-		return
-	}
-
-	// Accept raw base64 or a data URL (data:image/png;base64,....).
-	payload := req.Base64
-	if i := strings.Index(payload, ","); strings.HasPrefix(payload, "data:") && i >= 0 {
-		payload = payload[i+1:]
-	}
-	data, err := base64.StdEncoding.DecodeString(payload)
-	if err != nil {
-		writeJSON(w, http.StatusBadRequest, map[string]any{"status": "error", "message": "invalid base64"})
-		return
-	}
-
-	ctx := context.Background()
-	uploaded, err := h.Client.Upload(ctx, data, whatsmeow.MediaImage)
-	if err != nil {
-		writeJSON(w, http.StatusInternalServerError, map[string]any{"status": "error", "message": err.Error()})
-		return
-	}
-
-	jid := userJID(req.Phone)
-	if req.IsGroup {
-		jid = types.NewJID(strings.Split(req.Phone, "@")[0], types.GroupServer)
-	}
-	mimetype := "image/jpeg"
-	msg := &waE2E.Message{ImageMessage: &waE2E.ImageMessage{
-		Caption:       &req.Caption,
-		Mimetype:      &mimetype,
-		URL:           &uploaded.URL,
-		DirectPath:    &uploaded.DirectPath,
-		MediaKey:      uploaded.MediaKey,
-		FileEncSHA256: uploaded.FileEncSHA256,
-		FileSHA256:    uploaded.FileSHA256,
-		FileLength:    &uploaded.FileLength,
-	}}
-	if _, err := h.Client.SendMessage(ctx, jid, msg); err != nil {
-		writeJSON(w, http.StatusInternalServerError, map[string]any{"status": "error", "message": err.Error()})
-		return
-	}
-	writeJSON(w, http.StatusCreated, map[string]any{"status": "success"})
+	writeJSON(w, code, map[string]any{"status": "error", "message": message})
 }
 
 type sendSeenReq struct {
@@ -325,28 +374,6 @@ func (s *Server) checkNumber(w http.ResponseWriter, r *http.Request) {
 		"status":   "success",
 		"response": map[string]any{"numberExists": numberExists, "id": wid},
 	})
-}
-
-// allGroups lists the joined groups. Mirrors GET all-groups.
-func (s *Server) allGroups(w http.ResponseWriter, r *http.Request) {
-	h, ok := s.connected(w, chi.URLParam(r, "session"))
-	if !ok {
-		return
-	}
-	groups, err := h.Client.GetJoinedGroups(context.Background())
-	if err != nil {
-		writeJSON(w, http.StatusInternalServerError, map[string]any{"status": "error", "message": err.Error()})
-		return
-	}
-	out := make([]map[string]any, 0, len(groups))
-	for _, g := range groups {
-		out = append(out, map[string]any{
-			"id":           g.JID.String(),
-			"name":         g.Name,
-			"participants": len(g.Participants),
-		})
-	}
-	writeJSON(w, http.StatusOK, map[string]any{"status": "success", "response": out})
 }
 
 func (s *Server) dashboardStats(w http.ResponseWriter, _ *http.Request) {

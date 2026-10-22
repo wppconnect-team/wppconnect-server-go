@@ -4,14 +4,23 @@ package session
 
 import (
 	"context"
+	"database/sql"
+	"errors"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
 	"sync"
+	"sync/atomic"
+	"time"
+
+	"github.com/wppconnect-team/wppconnect-server-go/internal/directory"
+	"github.com/wppconnect-team/wppconnect-server-go/internal/media"
 
 	"go.mau.fi/whatsmeow"
 	"go.mau.fi/whatsmeow/store/sqlstore"
+	"go.mau.fi/whatsmeow/types"
 	"go.mau.fi/whatsmeow/types/events"
 	waLog "go.mau.fi/whatsmeow/util/log"
 
@@ -27,6 +36,8 @@ const (
 	StatusQRCode       Status = "QRCODE"
 	StatusConnected    Status = "CONNECTED"
 	StatusClosed       Status = "CLOSED"
+	StatusDisconnected Status = "DISCONNECTED"
+	StatusUnpaired     Status = "UNPAIRED"
 )
 
 // Handle is the Go counterpart of the Node SessionHandle: it owns one
@@ -38,12 +49,22 @@ const (
 // both fields; Name and Client are set once before the handle is published
 // and never mutated afterwards, so they can be read without holding mu.
 type Handle struct {
-	Name   string
-	Client *whatsmeow.Client
+	Name      string
+	Client    *whatsmeow.Client
+	Media     *media.Store
+	Directory *directory.State
 
-	mu     sync.RWMutex
-	status Status
-	qrCode string
+	mu        sync.RWMutex
+	status    Status
+	qrCode    string
+	runtime   runtimeClient
+	container io.Closer
+	cancel    context.CancelFunc
+	ctx       context.Context
+	paired    bool
+	events    sync.RWMutex
+	closing   bool
+	workers   sync.WaitGroup
 }
 
 // GetStatus returns the handle's current status.
@@ -82,25 +103,71 @@ type EventSink interface {
 	OnMessage(session string, msg *events.Message)
 }
 
+// GroupEventSink extends sinks that consume group lifecycle and metadata events.
+type GroupEventSink interface {
+	OnGroupEvent(session string, evt any)
+}
+
+type DirectoryEventSink interface{ OnDirectoryEvent(session string, evt any) }
+
+type StatusEventSink interface {
+	OnStatus(session string, status Status)
+}
+
+type runtimeClient interface {
+	ConnectContext(context.Context) error
+	Disconnect()
+	Logout(context.Context) error
+	IsLoggedIn() bool
+	GetQRChannel(context.Context) (<-chan whatsmeow.QRChannelItem, error)
+	AddEventHandler(whatsmeow.EventHandler) uint32
+	RemoveEventHandlers()
+}
+
+var (
+	ErrStopping     = errors.New("session manager is shutting down")
+	ErrDisconnected = errors.New("start and connect the session before logging out")
+	ErrInvalidName  = errors.New("session must contain 1 to 64 ASCII letters, digits, underscores or hyphens")
+)
+
 // Manager owns all live sessions, keyed by name.
 type Manager struct {
-	mu       sync.RWMutex
-	sessions map[string]*Handle
-	dataDir  string
-	sink     EventSink
-	log      waLog.Logger
+	mu           sync.RWMutex
+	sessions     map[string]*Handle
+	dataDir      string
+	sink         EventSink
+	log          waLog.Logger
+	op           sync.Mutex
+	ctx          context.Context
+	cancel       context.CancelFunc
+	stopping     atomic.Bool
+	restoring    atomic.Bool
+	shutdownOnce sync.Once
+	shutdownDone chan struct{}
+	shutdownErr  error
+	open         func(context.Context, string) (*Handle, error)
 }
 
 // NewManager creates a session manager backed by one SQLite store per session.
-func NewManager(_ context.Context, dataDir string, sink EventSink) (*Manager, error) {
+func NewManager(ctx context.Context, dataDir string, sink EventSink) (*Manager, error) {
+	if err := os.MkdirAll(dataDir, 0o700); err != nil {
+		return nil, err
+	}
 	logger := waLog.Stdout("wppgo", "INFO", true)
-	return &Manager{
+	life, cancel := context.WithCancel(ctx)
+	m := &Manager{
 		sessions: make(map[string]*Handle),
 		dataDir:  dataDir,
 		sink:     sink,
 		log:      logger,
-	}, nil
+		ctx:      life, cancel: cancel, shutdownDone: make(chan struct{}),
+	}
+	m.open = m.openHandle
+	return m, nil
 }
+
+func (m *Manager) IsStopping() bool { return m.stopping.Load() }
+func (m *Manager) IsReady() bool    { return !m.stopping.Load() && !m.restoring.Load() }
 
 // Get returns the handle for a session, if it exists.
 func (m *Manager) Get(name string) (*Handle, bool) {
@@ -125,99 +192,363 @@ func (m *Manager) openContainer(ctx context.Context, name string) (*sqlstore.Con
 		return nil, err
 	}
 	dbPath := filepath.Join(m.dataDir, safeName(name)+".db")
-	container, err := sqlstore.New(ctx, "sqlite", "file:"+dbPath+"?_pragma=foreign_keys(1)", m.log)
+	db, err := sql.Open("sqlite", "file:"+filepath.ToSlash(dbPath)+"?_pragma=foreign_keys(1)&_pragma=busy_timeout(5000)")
 	if err != nil {
 		return nil, fmt.Errorf("open store: %w", err)
+	}
+	db.SetMaxOpenConns(1)
+	container := sqlstore.NewWithDB(db, "sqlite", m.log)
+	if err = container.Upgrade(ctx); err != nil {
+		container.Close()
+		return nil, fmt.Errorf("upgrade store: %w", err)
 	}
 	return container, nil
 }
 
-func safeName(name string) string {
-	name = filepath.Base(name)
-	name = strings.ReplaceAll(name, ":", "_")
-	name = strings.ReplaceAll(name, "/", "_")
-	name = strings.ReplaceAll(name, "\\", "_")
-	if name == "." || name == "" {
-		return "default"
+func safeName(name string) string { return name }
+
+func validName(name string) bool {
+	if len(name) == 0 || len(name) > 64 {
+		return false
 	}
-	return name
+	return strings.IndexFunc(name, func(r rune) bool {
+		return !(r >= 'a' && r <= 'z' || r >= 'A' && r <= 'Z' || r >= '0' && r <= '9' || r == '_' || r == '-')
+	}) < 0
+}
+
+func (m *Manager) openHandle(ctx context.Context, name string) (*Handle, error) {
+	container, err := m.openContainer(ctx, name)
+	if err != nil {
+		return nil, err
+	}
+	record, err := m.readRecord(name)
+	if err != nil {
+		container.Close()
+		return nil, err
+	}
+	if record.Revoked {
+		devices, e := container.GetAllDevices(ctx)
+		if e != nil {
+			container.Close()
+			return nil, e
+		}
+		for _, device := range devices {
+			if e = device.Delete(ctx); e != nil {
+				container.Close()
+				return nil, e
+			}
+		}
+	}
+	deviceStore, err := container.GetFirstDevice(ctx)
+	if err != nil {
+		container.Close()
+		return nil, fmt.Errorf("get device: %w", err)
+	}
+	index, err := directory.Open(filepath.Join(m.dataDir, name+".directory.db"))
+	if err != nil {
+		container.Close()
+		return nil, fmt.Errorf("open chat index: %w", err)
+	}
+	client := whatsmeow.NewClient(deviceStore, m.log)
+	client.BackgroundEventCtx = ctx
+	client.InitialAutoReconnect = deviceStore.ID != nil
+	return &Handle{Name: name, Client: client, runtime: client, container: container, paired: deviceStore.ID != nil,
+		Media: media.NewStore(), Directory: directory.NewState(index), status: StatusInitializing}, nil
 }
 
 // Start creates (or reuses) a session and begins connecting. It registers the
 // event handlers that forward QR / connection / message events to the sink.
 func (m *Manager) Start(ctx context.Context, name string) (*Handle, error) {
-	m.mu.Lock()
-	if h, ok := m.sessions[name]; ok {
-		m.mu.Unlock()
-		return h, nil
+	if !validName(name) {
+		return nil, ErrInvalidName
 	}
+	m.op.Lock()
+	defer m.op.Unlock()
+	return m.startLocked(ctx, name)
+}
 
-	container, err := m.openContainer(ctx, name)
-	if err != nil {
-		m.mu.Unlock()
+func (m *Manager) startLocked(ctx context.Context, name string) (*Handle, error) {
+	if m.stopping.Load() || m.ctx.Err() != nil {
+		return nil, ErrStopping
+	}
+	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
-	deviceStore, err := container.GetFirstDevice(ctx)
-	if err != nil {
-		m.mu.Unlock()
-		return nil, fmt.Errorf("get device: %w", err)
+	if h, ok := m.Get(name); ok {
+		return h, nil
 	}
-
-	client := whatsmeow.NewClient(deviceStore, m.log)
-	h := &Handle{Name: name, Client: client, status: StatusInitializing}
+	if len(m.List()) >= 100 {
+		return nil, errors.New("limit of 100 live sessions reached")
+	}
+	life, cancel := context.WithCancel(m.ctx)
+	stopRequest := context.AfterFunc(ctx, cancel)
+	defer stopRequest()
+	timer := time.AfterFunc(30*time.Second, cancel)
+	defer timer.Stop()
+	h, err := m.open(life, name)
+	if err != nil {
+		cancel()
+		return nil, err
+	}
+	h.ctx, h.cancel = life, cancel
+	if err = m.writeRecord(sessionRecord{Name: name, Restore: true}); err != nil {
+		m.release(h)
+		return nil, err
+	}
+	m.mu.Lock()
 	m.sessions[name] = h
 	m.mu.Unlock()
-
-	// Roll back the just-published handle on any failure below, instead of
-	// leaving a permanently-stuck, half-initialized handle visible via
-	// Get/List — the client never connected, so it can't ever surface a
-	// connection-state change to clear itself out.
 	fail := func(err error) (*Handle, error) {
+		m.release(h)
 		m.mu.Lock()
 		delete(m.sessions, name)
 		m.mu.Unlock()
 		return nil, err
 	}
-
-	client.AddEventHandler(func(evt any) {
+	h.runtime.AddEventHandler(func(evt any) {
+		h.events.RLock()
+		defer h.events.RUnlock()
+		if h.closing {
+			return
+		}
 		switch v := evt.(type) {
 		case *events.Connected:
 			h.SetStatus(StatusConnected)
-			m.sink.OnConnected(name)
+			h.SetQRCode("")
+			if m.sink != nil {
+				m.sink.OnConnected(name)
+			}
+		case *events.Disconnected:
+			m.status(h, StatusDisconnected)
+			h.SetQRCode("")
+			h.Directory.ResetPresence()
+		case events.PermanentDisconnect:
+			state := StatusClosed
+			_, revoked := evt.(*events.LoggedOut)
+			if revoked {
+				state = StatusUnpaired
+			}
+			m.status(h, state)
+			go m.permanent(h, revoked)
 		case *events.Message:
-			m.sink.OnMessage(name, v)
+			m.forwardMessage(h, v)
+		case *events.GroupInfo, *events.JoinedGroup, *events.Picture:
+			m.observeDirectory(h, v)
+			m.forwardGroupEvent(name, v)
+		case *events.HistorySync, *events.Archive, *events.Pin, *events.MarkChatAsRead, *events.DeleteChat, *events.Presence, *events.ChatPresence:
+			m.forwardDirectoryEvent(h, v)
 		}
 	})
 
-	if client.Store.ID == nil {
+	if !h.paired {
 		// Not logged in: stream QR codes until the user scans.
-		qrChan, _ := client.GetQRChannel(ctx)
-		if err := client.Connect(); err != nil {
-			return fail(fmt.Errorf("connect: %w", err))
+		qrChan, err := h.runtime.GetQRChannel(life)
+		if err != nil {
+			return fail(fmt.Errorf("QR channel: %w", err))
 		}
+		h.workers.Add(1)
 		go func() {
-			for evt := range qrChan {
-				if evt.Event == "code" {
-					h.SetStatus(StatusQRCode)
-					h.SetQRCode(evt.Code)
-					m.sink.OnQR(name, evt.Code)
+			defer h.workers.Done()
+			for {
+				select {
+				case <-life.Done():
+					return
+				case evt, ok := <-qrChan:
+					if !ok {
+						return
+					}
+					h.events.RLock()
+					if h.closing {
+						h.events.RUnlock()
+						return
+					}
+					if evt.Event == "code" {
+						h.SetStatus(StatusQRCode)
+						h.SetQRCode(evt.Code)
+						if m.sink != nil {
+							m.sink.OnQR(name, evt.Code)
+						}
+					} else {
+						h.SetQRCode("")
+						if evt.Event != "success" {
+							go m.permanent(h, false)
+						}
+					}
+					h.events.RUnlock()
 				}
 			}
 		}()
-	} else if err := client.Connect(); err != nil {
+	}
+	if err := h.runtime.ConnectContext(life); err != nil {
 		return fail(fmt.Errorf("connect: %w", err))
 	}
-
+	if err := life.Err(); err != nil {
+		return fail(err)
+	}
 	return h, nil
 }
 
-// Close disconnects and forgets a session.
-func (m *Manager) Close(name string) {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	if h, ok := m.sessions[name]; ok {
-		h.Client.Disconnect()
-		h.SetStatus(StatusClosed)
+func (m *Manager) forwardGroupEvent(name string, evt any) {
+	if picture, ok := evt.(*events.Picture); ok && (picture == nil || picture.JID.Server != types.GroupServer) {
+		return
+	}
+	if sink, ok := m.sink.(GroupEventSink); ok {
+		sink.OnGroupEvent(name, evt)
+	}
+}
+
+func (m *Manager) forwardMessage(h *Handle, evt *events.Message) {
+	if evt == nil {
+		return
+	}
+	m.observeDirectory(h, evt)
+	// Register before dispatch so webhook consumers can download immediately.
+	message := evt.Message
+	if message == nil {
+		message = evt.RawMessage
+	}
+	h.Media.Remember(evt.Info.ID, message)
+	if m.sink != nil {
+		m.sink.OnMessage(h.Name, evt)
+	}
+}
+
+func (m *Manager) observeDirectory(h *Handle, evt any) {
+	if err := h.Directory.Observe(evt); err != nil && m.log != nil {
+		m.log.Warnf("chat index update failed: %v", err)
+	}
+}
+
+func (m *Manager) forwardDirectoryEvent(h *Handle, evt any) {
+	m.observeDirectory(h, evt)
+	if sink, ok := m.sink.(DirectoryEventSink); ok {
+		sink.OnDirectoryEvent(h.Name, evt)
+	}
+}
+
+func (m *Manager) status(h *Handle, status Status) {
+	h.SetStatus(status)
+	if sink, ok := m.sink.(StatusEventSink); ok {
+		sink.OnStatus(h.Name, status)
+	}
+}
+
+func (m *Manager) release(h *Handle) error {
+	h.events.Lock()
+	h.closing = true
+	h.SetQRCode("")
+	h.events.Unlock()
+	if h.cancel != nil {
+		h.cancel()
+	}
+	if h.runtime != nil {
+		h.runtime.Disconnect()
+		h.runtime.RemoveEventHandlers()
+	}
+	h.workers.Wait()
+	var err error
+	if h.Directory != nil {
+		err = h.Directory.Close()
+	}
+	if h.container != nil {
+		err = errors.Join(err, h.container.Close())
+	}
+	return err
+}
+
+// Close preserves credentials but disables automatic restoration until Start.
+func (m *Manager) Close(name string) error {
+	if !validName(name) {
+		return ErrInvalidName
+	}
+	m.op.Lock()
+	defer m.op.Unlock()
+	if m.stopping.Load() {
+		return ErrStopping
+	}
+	record, err := m.readRecord(name)
+	if err != nil {
+		return err
+	}
+	record.Restore = false
+	if err = m.writeRecord(record); err != nil {
+		return err
+	}
+	if h, ok := m.Get(name); ok {
+		m.status(h, StatusClosed)
+		err = m.release(h)
+		m.mu.Lock()
 		delete(m.sessions, name)
+		m.mu.Unlock()
+	}
+	return err
+}
+
+// Logout revokes the linked device. Failed revocation preserves the live handle.
+func (m *Manager) Logout(ctx context.Context, name string) error {
+	if !validName(name) {
+		return ErrInvalidName
+	}
+	m.op.Lock()
+	defer m.op.Unlock()
+	if m.stopping.Load() {
+		return ErrStopping
+	}
+	h, ok := m.Get(name)
+	if !ok || !h.runtime.IsLoggedIn() {
+		return ErrDisconnected
+	}
+	if err := h.runtime.Logout(ctx); err != nil {
+		return err
+	}
+	err := m.writeRecord(sessionRecord{Name: name, Revoked: true})
+	m.status(h, StatusUnpaired)
+	err = errors.Join(err, m.release(h))
+	m.mu.Lock()
+	delete(m.sessions, name)
+	m.mu.Unlock()
+	return err
+}
+
+func (m *Manager) permanent(h *Handle, revoked bool) {
+	m.op.Lock()
+	defer m.op.Unlock()
+	if current, ok := m.Get(h.Name); !ok || current != h {
+		return
+	}
+	if err := m.writeRecord(sessionRecord{Name: h.Name, Revoked: revoked}); err != nil {
+		m.log.Errorf("persist session stop: %v", err)
+	}
+	if err := m.release(h); err != nil {
+		m.log.Warnf("close session: %v", err)
+	}
+	m.mu.Lock()
+	delete(m.sessions, h.Name)
+	m.mu.Unlock()
+}
+
+// Shutdown retains restoration intent and drains owned resources once.
+func (m *Manager) Shutdown(ctx context.Context) error {
+	m.shutdownOnce.Do(func() {
+		m.stopping.Store(true)
+		m.cancel()
+		go func() {
+			defer close(m.shutdownDone)
+			m.op.Lock()
+			defer m.op.Unlock()
+			for _, h := range m.List() {
+				m.status(h, StatusClosed)
+				m.shutdownErr = errors.Join(m.shutdownErr, m.release(h))
+				m.mu.Lock()
+				delete(m.sessions, h.Name)
+				m.mu.Unlock()
+			}
+		}()
+	})
+	select {
+	case <-m.shutdownDone:
+		return m.shutdownErr
+	case <-ctx.Done():
+		return ctx.Err()
 	}
 }

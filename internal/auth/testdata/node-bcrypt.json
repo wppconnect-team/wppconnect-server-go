@@ -1,0 +1,26 @@
+{
+  "generator": "Node bcrypt 6.0.0; test credentials only",
+  "fixtures": [
+    {
+      "session": "alpha",
+      "secret": "test-secret",
+      "raw": "$2b$10$......................L5G9uiE07TarVFXrx3Y9.CDqphUj06O",
+      "token": "$2b$10$......................L5G9uiE07TarVFXrx3Y9.CDqphUj06O",
+      "full": "alpha:$2b$10$......................L5G9uiE07TarVFXrx3Y9.CDqphUj06O"
+    },
+    {
+      "session": "sessao",
+      "secret": "segredo-com-acentos-áç",
+      "raw": "$2b$10$......................IBOO7E0ZUF/IOVe98vdlBYq9XKlWYM2",
+      "token": "$2b$10$......................IBOO7E0ZUF_IOVe98vdlBYq9XKlWYM2",
+      "full": "sessao:$2b$10$......................IBOO7E0ZUF_IOVe98vdlBYq9XKlWYM2"
+    },
+    {
+      "session": "limit",
+      "secret": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+      "raw": "$2b$10$......................g2g4NxJpKw403DY8gXbZkjlorsGPEG.",
+      "token": "$2b$10$......................g2g4NxJpKw403DY8gXbZkjlorsGPEG.",
+      "full": "limit:$2b$10$......................g2g4NxJpKw403DY8gXbZkjlorsGPEG."
+    }
+  ]
+}
