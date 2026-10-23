@@ -1,8 +1,8 @@
 # Mídia: imagens, arquivos, áudio e download
 
-Esta etapa está implementada neste checkout. Use uma imagem construída a
-partir dele ou uma release que inclua essas alterações. A imagem `0.1.2`
-citada no [guia do Portainer](docker-portainer.pt-BR.md) ainda não as contém.
+Esta etapa está disponível a partir da imagem publicada `0.1.3`, para Linux
+amd64 e arm64. A imagem antiga `0.1.2` não contém essas alterações.
+Veja o [guia do Portainer](docker-portainer.pt-BR.md) para implantação.
 
 Todas as rotas abaixo exigem `Authorization: Bearer TOKEN` da sessão e uma
 sessão conectada. Os exemplos usam Bash, `curl`, `jq` e as variáveis

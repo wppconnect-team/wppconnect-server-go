@@ -1,8 +1,8 @@
 # Operação e ciclo de sessão
 
-Estes recursos exigem uma imagem construída deste checkout ou uma release que
-os inclua. A tag publicada `0.1.2` mantém o comportamento anterior. Esta entrega
-é uma PR, sem release ou validação com conta WhatsApp real.
+Estes recursos estão disponíveis a partir da imagem publicada `0.1.3`, para
+Linux amd64 e arm64. A tag antiga `0.1.2` mantém o comportamento anterior.
+Os testes automatizados usam transporte simulado, sem validação com conta real.
 
 ## Início, desconexão e logout
 
@@ -136,5 +136,5 @@ go run ./cmd/smoke-image -image wppconnect-go:check -platform linux/amd64
 ```
 
 Use `linux/arm64` nas duas opções para testar a variante ARM com emulação ou
-host compatível. A PR configura essas verificações no CI; somente resultados
-de execução confirmam aprovação. Nenhuma imagem nova foi publicada nesta entrega.
+host compatível. O CI executa essas verificações antes da publicação;
+a release `v0.1.3` inclui as imagens aprovadas para as duas arquiteturas.

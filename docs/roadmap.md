@@ -17,8 +17,9 @@ da release publicada.
 - [x] Testes HTTP de geração, autorização, isolamento entre sessões e troca de segredo.
 
 As entregas de autenticação, mídia, grupos, contatos/chats/presença e operação
-estão neste checkout e não na imagem
-`0.1.2`. O [guia de implantação](docker-portainer.pt-BR.md) mostra os dois caminhos.
+foram publicadas na [release v0.1.3](https://github.com/wppconnect-team/wppconnect-server-go/releases/tag/v0.1.3),
+com imagens Linux amd64/arm64. A imagem antiga `0.1.2` não inclui essas etapas.
+O [guia de implantação](docker-portainer.pt-BR.md) usa `0.1.3` como base.
 
 ## 1. Mídia: concluída no código-fonte
 
@@ -36,8 +37,8 @@ Validado por testes HTTP, webhook e descriptografia real do SDK com transporte
 simulado. Veja [contratos, exemplos e limites de mídia](media.pt-BR.md).
 O índice de descritores é limitado e fica em memória; caminhos locais/URLs de
 upload, transcodificação, vídeo, stickers e opções avançadas do Node ficam fora
-desta entrega. A validação manual com uma conta pareada e a publicação de uma
-imagem com essas alterações ainda precisam acontecer.
+desta entrega. A validação manual com conta real continua sendo uma atividade
+separada. A imagem `0.1.3` inclui essas alterações.
 
 ## 2. Grupos: concluída no código-fonte
 
@@ -53,8 +54,8 @@ metadados. Veja [contratos, exemplos e limites de grupos](groups.pt-BR.md).
 
 Critério de conclusão atendido por testes HTTP de sucesso, autorização por
 sessão, permissões, resultados parciais, limites e falhas de protocolo, além de
-normalização/encaminhamento e entrega dos eventos por webhook. A validação com
-uma conta real e a publicação da imagem ainda precisam acontecer.
+normalização/encaminhamento e entrega dos eventos por webhook. A imagem `0.1.3`
+foi publicada; validação com conta real continua sendo uma atividade separada.
 
 ## 3. Contatos, chats e presença: concluída no código-fonte
 
@@ -72,14 +73,14 @@ Critério de conclusão atendido por testes HTTP, SQLite real com reabertura,
 eventos fora de ordem, concorrência, expiração, timers, isolamento e entrega de
 webhooks simulados. Veja [contratos e exemplos](contacts-chats-presence.pt-BR.md).
 Filtros por etiquetas/comunidades e oito consultas históricas sem suporte
-retornam `501`. A validação com conta real e a publicação continuam pendentes.
+retornam `501`. A imagem `0.1.3` inclui a etapa; validação com conta real é separada.
 
 ## 4. Operação e ciclo de sessão: implementada no código-fonte
 
 - [x] Restaurar automaticamente sessões persistidas após reinício.
 - [x] Separar desconexão de logout/revogação de credenciais.
 - [x] Encerrar clientes e bancos no shutdown e testar recuperação após reinício.
-- [x] Preparar publicação de imagens Linux arm64 e amd64 com testes das duas arquiteturas no CI.
+- [x] Publicar imagens Linux arm64 e amd64 após testes das duas arquiteturas no CI.
 - [x] Adicionar verificações de inicialização, healthcheck, shutdown e reinício da imagem no CI.
 - [x] Adicionar retentativas e limites à entrega de webhooks.
 
@@ -92,9 +93,9 @@ webhook são limitados. Veja o [guia de operação](operation.pt-BR.md).
 
 Os testes locais cobrem SQLite real, restauração, bancos corrompidos,
 concorrência, cancelamento, logout recusado e retentativas HTTP. O workflow
-multiarch exige os testes das imagens antes do push. A execução desse workflow
-e a publicação efetiva das imagens dependem do merge/release. O build Docker
-amd64 foi executado localmente; isso não equivale a executar o CI de arm64.
+multiarch exige os testes das imagens antes do push. A release `v0.1.3` foi
+publicada com as duas arquiteturas após aprovação de testes Go com detector
+de corridas, análise CodeQL e smoke tests das imagens no CI.
 
 ## 5. Contrato e qualidade: implementada no código-fonte
 
@@ -110,13 +111,38 @@ os testes Go com detector de corridas. A [matriz](compatibility.pt-BR.md)
 registra cobertura e diferenças. Fixtures bcrypt são geradas com Node bcrypt
 6.0.0 e verificadas no Go, incluindo Unicode e limite de 72 bytes.
 
-## Entrega por PR e publicação
+## Base publicada e comparação com Evolution Go
 
-A implementação das etapas está preparada para revisão em PR. Por orientação
-do usuário, não foi feita validação com uma conta WhatsApp real e não será
-criada release nesta entrega. A tag `0.1.2` continua representando a imagem
-antiga. Os pipelines adicionados serão executados pelo GitHub na PR e na release;
-resultados pendentes não são apresentados como já aprovados.
+A PR #5 foi integrada e originou a release `v0.1.3`. Os testes de transporte
+WhatsApp são simulados; por orientação do usuário, não foi feito pareamento
+com conta real nesta entrega. Isso não equivale a paridade completa com o
+servidor Node ou com Evolution Go.
+
+O [benchmark em inglês](evolution-go-benchmark.md) fixa Evolution Go `0.7.2`
+no commit `9337afc47e10b86cc896a6f432240e40fee95dd1`, compara o código efetivo e
+registra diferenças entre rotas anunciadas, implementações e itens com TODO.
+As próximas etapas são futuras entregas; o README não as anuncia como prontas.
+
+## 6. Expansão de capacidades: próximas etapas
+
+- [ ] Mensagens nativas adicionais: vídeo, stickers, contatos, localização e enquetes.
+- [ ] Ações/contexto: reação, quote/menções, edição/revogação e recibos com IDs explícitos.
+- [ ] Persistência de mensagens/histórico com paginação, retenção e isolamento por sessão.
+- [ ] Perfil, privacidade e bloqueios, com permissões e efeitos documentados.
+- [ ] Mutações verificadas de chats e persistência/eventos de etiquetas.
+- [ ] Outbox durável, replay e adaptadores opcionais para WebSocket, RabbitMQ e NATS.
+- [ ] Armazenamento de mídia opcional em S3/MinIO com acesso privado e retenção.
+- [ ] Pareamento por telefone, administração autenticada e configurações por sessão.
+- [ ] Avaliar comunidades/newsletters, status, interativos, chamadas e votos de enquetes.
+- [ ] Painel de gestão opcional, métricas e documentação complementar em inglês.
+- [ ] Definir e publicar um arquivo `LICENSE` próprio do projeto, sem presumir a licença da referência.
+
+Cada capacidade deve incluir contrato HTTP/OpenAPI, normalização de eventos
+quando aplicável, limites, autorização por sessão e testes de sucesso/falha.
+Adaptadores externos devem ter teste de integração e recuperação de falhas;
+armazenamento deve definir retenção e migração. Endpoints sem implementação
+continuam explícitos como não suportados. Não haverá conclusão por contagem
+de rotas ou pela simples presença de um método no SDK.
 
 Histórias/status, catálogo, templates interativos e edição de perfil comercial
 precisam de uma avaliação específica de suporte no whatsmeow antes de qualquer
