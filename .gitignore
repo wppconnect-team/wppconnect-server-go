@@ -4,3 +4,5 @@ userDataDir/
 *.db
 *.log
 .DS_Store
+.env
+graphify-out/

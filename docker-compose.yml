@@ -3,11 +3,18 @@ services:
     container_name: wpp-server-go
     image: wppconnect/wppconnect-server-go:${WPP_SERVER_GO_TAG:-latest}
     restart: unless-stopped
+    stop_grace_period: 35s
     environment:
       PORT: "21465"
       SECRET_KEY: "${SECRET_KEY:-THISISMYSECURETOKEN}"
       WEBHOOK_URL: "${WEBHOOK_URL:-}"
       DATA_DIR: "/data"
+      AUTO_RESTORE_SESSIONS: "${AUTO_RESTORE_SESSIONS:-true}"
+      SHUTDOWN_TIMEOUT: "${SHUTDOWN_TIMEOUT:-25s}"
+      WEBHOOK_WORKERS: "${WEBHOOK_WORKERS:-2}"
+      WEBHOOK_QUEUE_SIZE: "${WEBHOOK_QUEUE_SIZE:-256}"
+      WEBHOOK_ATTEMPTS: "${WEBHOOK_ATTEMPTS:-4}"
+      WEBHOOK_TIMEOUT: "${WEBHOOK_TIMEOUT:-10s}"
     volumes:
       - wpp_go_data:/data
     ports:

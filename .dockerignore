@@ -1,8 +1,12 @@
 .git
 .github
+.env
+.env.*
+!.env.example
 server
 server.exe
 *.db
 *.log
 userDataDir
 data
+graphify-out

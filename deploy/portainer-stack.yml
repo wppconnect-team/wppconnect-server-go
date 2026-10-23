@@ -1,0 +1,35 @@
+# Portainer Docker Standalone: Stacks > Add stack > Web editor.
+services:
+  wppconnect-go:
+    image: wppconnect/wppconnect-server-go:${WPP_SERVER_GO_TAG:-0.1.2}
+    restart: unless-stopped
+    stop_grace_period: 35s
+    environment:
+      PORT: "21465"
+      SECRET_KEY: "${SECRET_KEY:?Set SECRET_KEY in Portainer}"
+      WEBHOOK_URL: "${WEBHOOK_URL:-}"
+      DATA_DIR: "/data"
+      AUTO_RESTORE_SESSIONS: "${AUTO_RESTORE_SESSIONS:-true}"
+      SHUTDOWN_TIMEOUT: "${SHUTDOWN_TIMEOUT:-25s}"
+      WEBHOOK_WORKERS: "${WEBHOOK_WORKERS:-2}"
+      WEBHOOK_QUEUE_SIZE: "${WEBHOOK_QUEUE_SIZE:-256}"
+      WEBHOOK_ATTEMPTS: "${WEBHOOK_ATTEMPTS:-4}"
+      WEBHOOK_TIMEOUT: "${WEBHOOK_TIMEOUT:-10s}"
+    ports:
+      - "${WPP_SERVER_GO_PORT:-21465}:21465"
+    volumes:
+      - wpp_go_data:/data
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://127.0.0.1:21465/healthz || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 10s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+volumes:
+  wpp_go_data: {}
