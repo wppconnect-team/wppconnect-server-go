@@ -38,6 +38,8 @@ const (
 	Document
 	Audio
 	Voice
+	Video
+	Sticker
 )
 
 // Decode accepts raw base64 and data URLs, without allocating oversized output.
@@ -90,6 +92,14 @@ func MIME(data []byte, declared string, kind Kind) (string, error) {
 		}
 	}
 	switch kind {
+	case Video:
+		if detected != "video/mp4" {
+			return "", errors.New("video requires MP4; no transcoding is performed")
+		}
+	case Sticker:
+		if detected != "image/webp" {
+			return "", errors.New("stickers require prepared WebP; no transcoding is performed")
+		}
 	case Image:
 		switch detected {
 		case "image/jpeg", "image/png", "image/gif", "image/webp":
@@ -144,8 +154,10 @@ func Filename(value string) string {
 
 func UploadType(kind Kind) whatsmeow.MediaType {
 	switch kind {
-	case Image:
+	case Image, Sticker:
 		return whatsmeow.MediaImage
+	case Video:
+		return whatsmeow.MediaVideo
 	case Audio, Voice:
 		return whatsmeow.MediaAudio
 	default:
@@ -155,6 +167,18 @@ func UploadType(kind Kind) whatsmeow.MediaType {
 
 func Message(kind Kind, u whatsmeow.UploadResponse, mimetype, filename, caption string) *waE2E.Message {
 	switch kind {
+	case Video:
+		return &waE2E.Message{VideoMessage: &waE2E.VideoMessage{
+			URL: &u.URL, DirectPath: &u.DirectPath, MediaKey: u.MediaKey,
+			FileEncSHA256: u.FileEncSHA256, FileSHA256: u.FileSHA256, FileLength: &u.FileLength,
+			Mimetype: &mimetype, Caption: &caption,
+		}}
+	case Sticker:
+		return &waE2E.Message{StickerMessage: &waE2E.StickerMessage{
+			URL: &u.URL, DirectPath: &u.DirectPath, MediaKey: u.MediaKey,
+			FileEncSHA256: u.FileEncSHA256, FileSHA256: u.FileSHA256, FileLength: &u.FileLength,
+			Mimetype: &mimetype,
+		}}
 	case Image:
 		return &waE2E.Message{ImageMessage: &waE2E.ImageMessage{
 			URL: &u.URL, DirectPath: &u.DirectPath, MediaKey: u.MediaKey,

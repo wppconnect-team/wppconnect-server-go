@@ -73,6 +73,14 @@ func TestCapabilitiesE2EAgainstOpenAPI(t *testing.T) {
 		{"typing", "POST", "/api/alpha/typing", contacts.tokens["alpha"], `{"phone":"111","value":true}`, contacts.router, 200},
 		{"history-unsupported", "GET", "/api/alpha/all-new-messages", contacts.tokens["alpha"], "", contacts.router, 501},
 		{"media-send", "POST", "/api/alpha/send-image", media.tokens["alpha"], `{"phone":"123","base64":"` + base64.StdEncoding.EncodeToString(pngData(t)) + `"}`, media.router, 201},
+		{"video", "POST", "/api/alpha/send-video", media.tokens["alpha"], `{"phone":"123","base64":"` + base64.StdEncoding.EncodeToString(advancedFixture(t, "video.mp4")) + `"}`, media.router, 201},
+		{"video-alias", "POST", "/api/alpha/send-video-base64", media.tokens["alpha"], `{"phone":"123","base64":"` + base64.StdEncoding.EncodeToString(advancedFixture(t, "video.mp4")) + `"}`, media.router, 201},
+		{"sticker", "POST", "/api/alpha/send-sticker", media.tokens["alpha"], `{"phone":"123","base64":"` + base64.StdEncoding.EncodeToString(advancedFixture(t, "sticker.webp")) + `"}`, media.router, 201},
+		{"animated-sticker", "POST", "/api/alpha/send-sticker-gif", media.tokens["alpha"], `{"phone":"123","base64":"` + base64.StdEncoding.EncodeToString(advancedFixture(t, "animated.webp")) + `"}`, media.router, 201},
+		{"vcard", "POST", "/api/alpha/contact-vcard", media.tokens["alpha"], `{"phone":"123","contactsId":["5511999999999"],"name":"Ana"}`, media.router, 200},
+		{"multi-vcard", "POST", "/api/alpha/send-contact", media.tokens["alpha"], `{"phone":"123","contacts":[{"name":"Ana","phone":"5511999999999"}]}`, media.router, 201},
+		{"location", "POST", "/api/alpha/send-location", media.tokens["alpha"], `{"phone":"123","lat":"-23.55","lng":0,"title":"Office"}`, media.router, 201},
+		{"poll", "POST", "/api/alpha/send-poll-message", media.tokens["alpha"], `{"phone":"123","name":"Lunch?","choices":["12:00","13:00"],"options":{"selectableCount":1}}`, media.router, 201},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			server := httptest.NewServer(tc.handler)

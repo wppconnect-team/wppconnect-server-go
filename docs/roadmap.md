@@ -125,7 +125,7 @@ As próximas etapas são futuras entregas; o README não as anuncia como prontas
 
 ## 6. Expansão de capacidades: próximas etapas
 
-- [ ] Mensagens nativas adicionais: vídeo, stickers, contatos, localização e enquetes.
+- [x] Mensagens nativas adicionais: vídeo, stickers, contatos, localização e criação de enquetes (código-fonte).
 - [ ] Ações/contexto: reação, quote/menções, edição/revogação e recibos com IDs explícitos.
 - [ ] Persistência de mensagens/histórico com paginação, retenção e isolamento por sessão.
 - [ ] Perfil, privacidade e bloqueios, com permissões e efeitos documentados.
@@ -136,6 +136,21 @@ As próximas etapas são futuras entregas; o README não as anuncia como prontas
 - [ ] Avaliar comunidades/newsletters, status, interativos, chamadas e votos de enquetes.
 - [ ] Painel de gestão opcional, métricas e documentação complementar em inglês.
 - [ ] Definir e publicar um arquivo `LICENSE` próprio do projeto, sem presumir a licença da referência.
+
+A etapa de mensagens nativas adiciona oito rotas autenticadas: vídeo MP4/H.264
+com legenda, stickers WebP estáticos/animados, vCards individuais/múltiplos,
+localização estática e criação de enquetes com segredo independente por
+destinatário. Inclui eventos normalizados, download de vídeo/sticker isolado
+por sessão, validação de formato/tamanho, falhas parciais e exemplos completos
+no [guia em inglês](advanced-messages.md). Não está incluída na imagem `0.1.3`.
+
+Critério de conclusão: testes HTTP de sucesso/falha, limites e autorização;
+contratos OpenAPI e fluxos TCP por capacidade; normalização e entrega de
+webhooks; registro de mídia antes do evento; descriptografia/integridade real
+do SDK para vídeo/stickers com transporte simulado. Sem pareamento de conta
+real, conforme orientação do usuário. Os testes usam fixtures MP4/WebP reais
+geradas sinteticamente. Não há transcodificação, leitura de caminhos/URLs,
+localização ao vivo ou processamento de votos/resultados de enquetes nesta etapa.
 
 Cada capacidade deve incluir contrato HTTP/OpenAPI, normalização de eventos
 quando aplicável, limites, autorização por sessão e testes de sucesso/falha.
