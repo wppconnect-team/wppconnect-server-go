@@ -1,6 +1,6 @@
 # Matriz de compatibilidade e validação
 
-Esta matriz descreve o código desta PR, sem afirmar paridade com todas as rotas
+Esta matriz descreve as capacidades publicadas a partir de `0.1.3`, sem afirmar paridade com todas as rotas
 ou estruturas internas do servidor Node. A referência de contrato é o checkout
 `wppconnect-server` v2.10.27 e o fork whatsmeow fixado no `go.mod`.
 
@@ -16,7 +16,7 @@ ou estruturas internas do servidor Node. A referência de contrato é o checkout
 | Presença | Assinatura, publicação, online/visto, digitação/gravação e eventos. | Presença desconhecida é null; TTL 5 min; sinais não renovam automaticamente. | HTTP, expiração, cancelamento e proteção contra pausa de comando antigo. |
 | Webhooks | Eventos normalizados, fila/concorrência limitadas e retentativas. | Sem fila durável/garantia de ordem; consumidor deduplica X-WPP-Event-ID. | Servidor HTTP simulado com 503/429/4xx, payload/fila, orçamento e shutdown. |
 | Mensagens históricas e filtros avançados | Oito rotas registradas e filtros sem suporte respondem 501. | Etiquetas, classificação de comunidades e consultas completas do navegador não implementadas. | Testes autenticados distinguem 400/401/404 de 501. |
-| Implantação | Docker, Standalone/Swarm e publicação multiarch preparada. | Uma réplica por volume; release e validação de conta real fora desta entrega. | Build local amd64 e pipeline com smoke tests amd64/arm64 e validação das stacks. |
+| Implantação | Docker, Standalone/Swarm e imagens `0.1.3` amd64/arm64 publicadas. | Uma réplica por volume; testes de conta real continuam separados. | Smoke tests amd64/arm64 e validação das stacks aprovados no CI da release. |
 
 ## OpenAPI e e2e
 
@@ -53,5 +53,5 @@ SECRET_KEY=ci-only-secret docker stack config -c deploy/portainer-swarm.yml
 
 `ci.yml` executa essas verificações em PRs. Os jobs de imagem usam o mesmo
 comando `cmd/smoke-image` documentado no [guia de operação](operation.pt-BR.md).
-O workflow de release só publica depois de suas verificações passarem. A PR
-não cria tags/releases e não altera uma implantação existente.
+O workflow de release só publica depois de suas verificações passarem. A release
+`v0.1.3` inclui a base funcional; mudanças de documentação não alteram uma implantação existente.

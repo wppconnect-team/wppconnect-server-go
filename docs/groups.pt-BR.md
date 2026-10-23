@@ -1,9 +1,8 @@
 # Grupos
 
-A etapa de grupos está implementada neste checkout. As novas rotas precisam de
-uma imagem construída com este código ou de uma release que inclua a alteração.
-A imagem `0.1.2` do [guia do Portainer](docker-portainer.pt-BR.md) ainda tem
-somente a listagem básica e os placeholders antigos.
+A etapa de grupos está disponível a partir da imagem publicada `0.1.3`, para
+Linux amd64 e arm64. A imagem antiga `0.1.2` tem somente a listagem básica e os
+placeholders antigos. Veja o [guia do Portainer](docker-portainer.pt-BR.md).
 
 Todas as rotas exigem uma sessão conectada e `Authorization: Bearer TOKEN`
 daquela sessão. A autorização de administrador e a participação no grupo são

@@ -1,8 +1,8 @@
 # Contatos, chats e presença
 
-Esta etapa está implementada neste checkout e exige uma imagem construída com
-este código ou uma release que o inclua. A imagem `0.1.2` citada no
-[guia do Portainer](docker-portainer.pt-BR.md) ainda não inclui esses recursos.
+Esta etapa está disponível a partir da imagem publicada `0.1.3`, para Linux
+amd64 e arm64. A imagem antiga `0.1.2` não inclui esses recursos.
+Veja o [guia do Portainer](docker-portainer.pt-BR.md).
 
 Todas as rotas exigem uma sessão conectada e o token dessa sessão. Os exemplos
 usam Bash, `curl`, `jq`, `BASE_URL`, `SESSION` e `TOKEN`, como nos guias anteriores.

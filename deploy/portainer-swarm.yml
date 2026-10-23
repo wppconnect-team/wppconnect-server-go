@@ -2,7 +2,7 @@
 version: "3.8"
 services:
   wppconnect-go:
-    image: wppconnect/wppconnect-server-go:${WPP_SERVER_GO_TAG:-0.1.2}
+    image: wppconnect/wppconnect-server-go:${WPP_SERVER_GO_TAG:-0.1.3}
     stop_grace_period: 35s
     environment:
       PORT: "21465"

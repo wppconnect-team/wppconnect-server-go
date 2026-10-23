@@ -2,7 +2,7 @@
 
 Sim, o wppconnect-server-go tem Docker e pode ser instalado pelo Portainer.
 A imagem oficial é [`wppconnect/wppconnect-server-go`](https://hub.docker.com/r/wppconnect/wppconnect-server-go).
-Este guia usa a tag publicada `0.1.2`, disponível para **Linux amd64**. O serviço
+Este guia usa a tag publicada `0.1.3`, disponível para **Linux amd64 e arm64**. O serviço
 é uma API HTTP, sem painel web, Chromium, Redis ou banco externo. As credenciais
 do WhatsApp ficam em arquivos SQLite no volume montado em `/data`.
 
@@ -10,16 +10,15 @@ do WhatsApp ficam em arquivos SQLite no volume montado em `/data`.
 
 - `0.1.2`: permite subir a API e usar as rotas existentes com um token bcrypt
   bruto enviado no header. Gere esse token com `cmd/token -raw`, como abaixo.
-- Este checkout adiciona `POST /api/{session}/{secretkey}/generate-token` e
+- A partir de `0.1.3`, a imagem inclui `POST /api/{session}/{secretkey}/generate-token` e
   aceita tokens no formato URL-safe do Node, além do campo `full` na URL.
-  Esses recursos precisam de uma imagem construída a partir deste código ou de
-  uma release que os inclua. A tag `0.1.2` não contém essa rota.
+  inclui mídia, grupos, contatos/chats/presença, restauração e shutdown ordenado.
+  A tag antiga `0.1.2` não contém esses recursos.
 - Confira as [tags publicadas](https://hub.docker.com/r/wppconnect/wppconnect-server-go/tags)
   antes de trocar a versão. `latest` acompanha releases estáveis; uma tag
   `sha-*` fixa uma revisão. Não presuma que uma alteração local já foi publicada.
-- A tag `0.1.2` é `linux/amd64`. Este checkout prepara publicação amd64/arm64
-  com testes das duas imagens no CI antes do push. Até uma release incluir as
-  alterações, construa a imagem para seu host.
+- A tag antiga `0.1.2` é `linux/amd64`; `0.1.3` publica amd64/arm64, com testes
+  das duas imagens no CI antes do push.
 - Restauração automática, shutdown ordenado e limites/retentativas de webhook
   estão implementados neste checkout. Veja o [guia de operação](operation.pt-BR.md).
 
@@ -32,7 +31,7 @@ No Portainer, abra o ambiente Docker, entre em **Stacks > Add stack**, use o nom
 ```yaml
 services:
   wppconnect-go:
-    image: wppconnect/wppconnect-server-go:${WPP_SERVER_GO_TAG:-0.1.2}
+    image: wppconnect/wppconnect-server-go:${WPP_SERVER_GO_TAG:-0.1.3}
     restart: unless-stopped
     stop_grace_period: 35s
     environment:
@@ -71,7 +70,7 @@ Em **Environment variables**, configure:
 | Variável | Valor / finalidade |
 | --- | --- |
 | `SECRET_KEY` | Obrigatória. Gere um segredo privado com `openssl rand -hex 24`. |
-| `WPP_SERVER_GO_TAG` | `0.1.2`, ou outra tag publicada que você tenha escolhido. |
+| `WPP_SERVER_GO_TAG` | `0.1.3`, ou outra tag publicada que você tenha escolhido. |
 | `WPP_SERVER_GO_PORT` | `21465`, porta publicada no servidor Docker. |
 | `WEBHOOK_URL` | Opcional. URL HTTP(S) do seu receptor de eventos. |
 
@@ -105,7 +104,7 @@ guardará os dados:
 docker node update --label-add wppconnect_go_data=true NOME_DO_NO
 ```
 
-Adicione esse label em **um único nó** Linux amd64. A stack usa uma réplica,
+Adicione esse label em **um único nó** Linux amd64 ou arm64. A stack usa uma réplica,
 volume local e atualização `stop-first`, para que duas instâncias não acessem
 as mesmas sessões simultaneamente. O volume pertence ao nó escolhido. Se ele
 ficar indisponível, o serviço ficará pendente até sua recuperação ou até uma
@@ -146,7 +145,7 @@ curl -fsS -o /dev/null -w 'HTTP %{http_code}\n' "$BASE_URL/healthz"
 `/healthz` verifica a API. O estado da conexão WhatsApp é consultado na rota
 `status-session` depois da autenticação.
 
-### 2. Gerar um token para a imagem publicada 0.1.2
+### 2. Gerar um token offline
 
 Na raiz deste checkout, com Go instalado, informe o **mesmo** `SECRET_KEY`
 configurado no Portainer. O helper funciona offline, sem iniciar uma sessão
@@ -157,18 +156,18 @@ ser baixadas na primeira execução.
 read -rsp 'SECRET_KEY do Portainer: ' SECRET_KEY
 echo
 export SECRET_KEY
-export TOKEN="$(go run ./cmd/token -session "$SESSION" -raw | jq -er .token)"
+export TOKEN="$(go run ./cmd/token -session "$SESSION" | jq -er .token)"
 test -n "$TOKEN"
 ```
 
-Use `-raw` para `0.1.2`: essa versão ainda não decodifica os tokens URL-safe do
+Acrescente `-raw` se ainda usa `0.1.2`: essa versão não decodifica os tokens URL-safe do
 Node. O token bruto pode conter `/` e deve ser enviado no header, nunca na URL.
 O comando `cmd/token` está disponível neste checkout; se sua cópia antiga não
 o contém, atualize para uma revisão que inclua esse comando.
 
-### 3. Alternativa: gerar pela API deste checkout
+### 3. Alternativa: gerar pela API publicada a partir de 0.1.3
 
-Com uma imagem que inclua a nova rota, você pode substituir o passo anterior
+Com `0.1.3` ou uma imagem posterior que inclua a rota, substitua o passo anterior
 por este. O exemplo assume sessão simples e segredo hexadecimal, sem caracteres
 que precisem de escape na URL:
 
@@ -287,7 +286,7 @@ docker run --rm \
 Aponte `wpp_go_data` para esse volume externo, conforme o exemplo anterior.
 Não remova o volume ao excluir ou recriar a stack.
 
-## Construir este código antes da próxima release
+## Construir alterações locais antes da próxima release
 
 No host Docker Standalone gerenciado pelo Portainer:
 
@@ -296,8 +295,8 @@ docker build -t wppconnect/wppconnect-server-go:local .
 ```
 
 Defina `WPP_SERVER_GO_TAG=local` e implante sem solicitar pull dessa tag. Esse
-build contém a nova rota de geração de tokens e as etapas de mídia, grupos e
-contatos/chats/presença.
+build inclui as alterações do checkout, que podem ser posteriores à versão
+publicada `0.1.3`.
 O Dockerfile deve ser construído
 na raiz do repositório. No Swarm, publique a imagem construída em um registry
 acessível aos nós e ajuste `image` no YAML para esse endereço/tag antes do deploy.
@@ -323,7 +322,7 @@ docker compose --env-file .env -f deploy/portainer-stack.yml ps
 | JSON no lugar do PNG | Aguarde `QRCODE` e repita o download antes de abrir a imagem. |
 | QR novo após atualização | Confira o nome da sessão, o volume montado e, no Swarm, o nó que contém os dados. |
 | Swarm em `Pending` | Verifique o label do nó, sua disponibilidade e arquitetura. |
-| `no matching manifest` | A imagem publicada é amd64; confirme a arquitetura do host. |
+| `no matching manifest` | Confirme a arquitetura do host e a tag: `0.1.2` é amd64; `0.1.3` inclui amd64/arm64. |
 | Webhook não chega | Teste a conectividade do container até o receptor e evite `localhost`. |
 | Porta não abre | Verifique porta publicada, firewall e logs do container/serviço. |
 

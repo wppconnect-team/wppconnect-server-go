@@ -1,7 +1,7 @@
 # Portainer Docker Standalone: Stacks > Add stack > Web editor.
 services:
   wppconnect-go:
-    image: wppconnect/wppconnect-server-go:${WPP_SERVER_GO_TAG:-0.1.2}
+    image: wppconnect/wppconnect-server-go:${WPP_SERVER_GO_TAG:-0.1.3}
     restart: unless-stopped
     stop_grace_period: 35s
     environment:
