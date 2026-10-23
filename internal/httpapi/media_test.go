@@ -33,6 +33,7 @@ type fakeMediaClient struct {
 	to           []types.JID
 	uploadErr    error
 	sendErr      error
+	sendFailAt   int
 	downloadErr  error
 	downloads    int
 	downloadData []byte
@@ -49,11 +50,21 @@ func (f *fakeMediaClient) Upload(ctx context.Context, data []byte, kind whatsmeo
 }
 
 func (f *fakeMediaClient) SendMessage(ctx context.Context, to types.JID, msg *waE2E.Message, _ ...whatsmeow.SendRequestExtra) (whatsmeow.SendResponse, error) {
+	if _, ok := ctx.Deadline(); !ok {
+		panic("send lacks deadline")
+	}
 	if err := ctx.Err(); err != nil {
 		return whatsmeow.SendResponse{}, err
 	}
 	f.sent, f.to = append(f.sent, msg), append(f.to, to)
+	if f.sendFailAt > 0 && len(f.sent) == f.sendFailAt {
+		return whatsmeow.SendResponse{}, errors.New("simulated partial failure")
+	}
 	return whatsmeow.SendResponse{ID: fmt.Sprintf("sent-%d", len(f.sent))}, f.sendErr
+}
+
+func (f *fakeMediaClient) BuildPollCreation(name string, choices []string, count int) *waE2E.Message {
+	return (&whatsmeow.Client{}).BuildPollCreation(name, choices, count)
 }
 
 func (f *fakeMediaClient) DownloadToFile(ctx context.Context, _ whatsmeow.DownloadableMessage, file whatsmeow.File) error {

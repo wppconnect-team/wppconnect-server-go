@@ -56,15 +56,16 @@ func contractSchemas() schema {
 	chat := object(schema{"id": ref("WID"), "name": str(), "formattedTitle": str(), "t": integer(), "unreadCount": integer(), "unreadCountIsPartial": boolean(), "archive": boolean(), "isArchived": boolean(), "pin": boolean(), "isGroup": boolean(), "isUser": boolean()}, "id", "name", "t", "unreadCount", "unreadCountIsPartial")
 	phone := stringList(100)
 	presence := object(schema{"phone": phone, "isGroup": boolean(), "isLid": boolean(), "value": boolean(), "all": boolean(), "duration": schema{"type": "integer", "minimum": 1, "maximum": 10000, "description": "Milliseconds; waits then pauses. Batch timeout is 30 seconds."}, "chatstate": schema{"oneOf": []schema{schema{"type": "integer", "enum": []int{0, 1, 2}}, schema{"type": "string", "enum": []string{"0", "1", "2"}}}}})
-	media := object(schema{"phone": phone, "isGroup": boolean(), "base64": str(), "base64Ptt": str(), "mimetype": str(), "filename": str(), "caption": str(), "message": str()}, "phone")
-	media["description"] = "Decoded media limit 16 MiB. base64 or base64Ptt is required for JSON. Voice requires Ogg/Opus. Upload paths and URLs are unsupported."
+	media := object(schema{"phone": phone, "isGroup": boolean(), "isLid": schema{"type": "boolean", "enum": []bool{false}}, "isNewsletter": schema{"type": "boolean", "enum": []bool{false}}, "base64": str(), "base64Ptt": str(), "path": str(), "mimetype": str(), "filename": str(), "caption": str(), "message": str()}, "phone")
+	media["description"] = "Decoded media limit 16 MiB. base64/base64Ptt or path containing a base64 data URL is required for JSON. Voice requires Ogg/Opus. Filesystem paths and remote URLs are unsupported."
 	return schema{
 		"WID": id, "Contact": contact, "Chat": chat,
-		"Error":        object(schema{"status": str(), "message": str(), "error": str(), "response": schema{}, "completed": schema{}, "capability": str(), "provider": str()}),
+		"Error":        object(schema{"status": str(), "message": str(), "error": str(), "response": schema{}, "completed": schema{}, "failedRecipient": str(), "capability": str(), "provider": str()}),
 		"Success":      object(schema{"status": str(), "session": str()}, "status"),
 		"Session":      object(schema{"status": str(), "session": str(), "qrcode": str(), "urlcode": str()}, "status", "session"),
 		"Token":        object(schema{"status": str(), "session": str(), "token": str(), "full": str()}, "status", "session", "token", "full"),
 		"MediaRequest": media, "PresenceRequest": presence,
+		"AdvancedSent":  envelope(array(object(schema{"id": str(), "to": str(), "type": str()}, "id", "to", "type"))),
 		"MediaSent":     envelope(array(object(schema{"id": str(), "to": str(), "mimetype": str(), "filename": str()}, "id", "to", "mimetype", "filename"))),
 		"MediaDownload": object(schema{"base64": str(), "mimetype": str()}, "base64", "mimetype"),
 		"Group":         object(schema{"id": str(), "name": str(), "subject": str(), "participants": array(schema{})}),
@@ -121,13 +122,45 @@ func contractFor(name string) routeContract {
 	case "check-number-status":
 		c.tag = "contacts"
 		c.response = envelope(object(schema{"numberExists": boolean(), "id": str()}, "numberExists", "id"))
-	case "send-image", "send-file", "send-file-base64", "send-voice", "send-voice-base64", "send-audio-base64":
+	case "send-image", "send-file", "send-file-base64", "send-voice", "send-voice-base64", "send-audio-base64", "send-video", "send-video-base64", "send-sticker", "send-sticker-gif":
 		c.tag = "media"
 		c.success = 201
 		c.body = ref("MediaRequest")
 		c.response = ref("MediaSent")
 		c.multipart = true
 		c.description = "Bounded media upload; at most four concurrent media operations per process."
+		if strings.HasPrefix(name, "send-video") {
+			c.description += " Go extension: MP4/H.264 with optional AAC, at most 16 MiB, 4096x4096, one hour; container inspection only, no transcoding."
+		}
+		if strings.HasPrefix(name, "send-sticker") {
+			c.description += " Prepared 512x512 WebP only, static 100 KiB or animated 500 KiB, 120 frames/10 seconds, frame minimum 10 ms. No captions or transcoding; send-sticker-gif requires animated WebP, not GIF."
+		}
+	case "send-contact", "contact-vcard":
+		c.tag, c.success, c.response = "messages", 201, ref("AdvancedSent")
+		if name == "contact-vcard" {
+			c.success = 200
+		}
+		card := object(schema{"name": schema{"type": "string", "maxLength": 256}, "phone": str()}, "phone")
+		card["additionalProperties"] = false
+		c.body = object(schema{"phone": stringList(100), "isGroup": boolean(), "contactsId": schema{"type": "array", "minItems": 1, "maxItems": 20, "items": str()}, "name": schema{"type": "string", "maxLength": 256}, "contacts": schema{"type": "array", "minItems": 1, "maxItems": 20, "items": card}}, "phone")
+		c.body["additionalProperties"] = false
+		c.body["oneOf"] = []schema{schema{"required": []string{"contactsId"}, "not": schema{"required": []string{"contacts"}}}, schema{"required": []string{"contacts"}, "not": schema{"required": []string{"contactsId"}}}}
+		c.description = "Native vCard(s), 7..15 digit contact numbers. Names fall back to numbers. contactsId/name follow Node fields; contacts and send-contact are Go extensions. Always returns an array of accepted IDs, unlike the Node contact-vcard single result."
+	case "send-location":
+		c.tag, c.success, c.response = "messages", 201, ref("AdvancedSent")
+		coord := func(limit int) schema {
+			return schema{"oneOf": []schema{schema{"type": "number", "minimum": -limit, "maximum": limit}, schema{"type": "string", "minLength": 1, "description": "Finite decimal within the same coordinate range"}}}
+		}
+		c.body = object(schema{"phone": stringList(100), "isGroup": boolean(), "lat": coord(90), "lng": coord(180), "title": schema{"type": "string", "maxLength": 256}, "address": schema{"type": "string", "maxLength": 1024}}, "phone", "lat", "lng")
+		c.body["additionalProperties"] = false
+		c.description = "Static location only. Zero coordinates are valid; numbers and Node numeric strings are accepted."
+	case "send-poll-message":
+		c.tag, c.success, c.response = "messages", 201, ref("AdvancedSent")
+		options := object(schema{"selectableCount": schema{"type": "integer", "minimum": 0, "maximum": 12, "default": 1, "description": "Zero means all choices; otherwise must not exceed choice count."}})
+		options["additionalProperties"] = false
+		c.body = object(schema{"phone": stringList(100), "isGroup": boolean(), "name": schema{"type": "string", "minLength": 1, "maxLength": 255}, "choices": schema{"type": "array", "minItems": 2, "maxItems": 12, "uniqueItems": true, "items": schema{"type": "string", "minLength": 1, "maxLength": 100}}, "options": options}, "phone", "name", "choices")
+		c.body["additionalProperties"] = false
+		c.description = "Native poll creation with independent SDK-generated secret per recipient; distinct trimmed/case-insensitive choices. No vote decryption or aggregation. Structured sends share four operation slots, 64 KiB request and 60 second batch timeout."
 	case "download-media", "get-media-by-message":
 		c.tag = "media"
 		c.response = ref("MediaDownload")
@@ -236,6 +269,13 @@ func contractFor(name string) routeContract {
 		c.response = envelope(schema{})
 	default:
 		panic("missing OpenAPI contract for " + name)
+	}
+	if name == "contact-vcard" || name == "send-contact" || name == "send-location" || name == "send-poll-message" {
+		props := c.body["properties"].(schema)
+		for _, flag := range []string{"isLid", "isNewsletter"} {
+			props[flag] = schema{"type": "boolean", "enum": []bool{false}}
+		}
+		c.description += " JSON limit 64 KiB, four shared operation slots, 60 second batch deadline. Errors can include completed IDs and failedRecipient; failed delivery may be unknown."
 	}
 	return c
 }

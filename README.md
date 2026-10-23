@@ -42,14 +42,20 @@ operational capabilities described here. Its Docker image is available for
 **Linux amd64 and arm64**. The older `0.1.2` image predates these additions.
 The `main` branch may include changes beyond a published release.
 
+**Source checkout additions:** native video, static/animated stickers, contact
+cards, locations and polls are implemented with bounded inputs, normalized
+webhooks and session-isolated media download. They require a build containing
+this stage; the `0.1.3` image does not include them. See the
+[advanced messaging guide](docs/advanced-messages.md) for complete examples.
+
 ## Features
 
 | Area | Available capabilities |
 | --- | --- |
 | Sessions | QR pairing, connection status, automatic restoration, separate disconnect/logout and graceful shutdown. |
 | Authentication | Session-bound bcrypt tokens, token generation, Bearer authentication and legacy Node token formats. |
-| Messaging | Text messages, number checks and the basic `send-seen` route. |
-| Media | Images, documents, regular audio and Ogg/Opus voice messages through base64 or multipart uploads; authenticated media download. |
+| Messaging | Text messages, contact cards, static locations, native polls, number checks and the basic `send-seen` route. Advanced types are source checkout additions. |
+| Media | Images, documents, regular audio, Ogg/Opus voice, MP4 video and prepared static/animated WebP stickers; base64/multipart uploads and authenticated download. Video/stickers are source checkout additions. |
 | Groups | 22 routes for participants/admins, metadata, restrictions, invitations, join/leave and group pictures. |
 | Contacts | Synchronized contacts, local phone number/LID association and profile status/picture queries. |
 | Chats | Persistent observed chat metadata, pagination, filters and updates from history/app-state events. |
@@ -58,7 +64,7 @@ The `main` branch may include changes beyond a published release.
 | Deployment | Docker, Compose, Portainer Standalone/Swarm examples, health/readiness endpoints and multiarch CI. |
 | API contract | OpenAPI 3.0.3, a compatibility matrix and HTTP contract tests. |
 
-The current OpenAPI describes **59 implemented HTTP operations** and **8
+The current OpenAPI describes **67 implemented HTTP operations** and **8
 explicitly unsupported history operations**. There is no bundled management UI,
 WebSocket endpoint, message broker or external database requirement for the
 current implementation. Planned capabilities are listed separately below.
@@ -240,6 +246,8 @@ from token generation, which checks `{secretkey}`.
 | Text and read receipts | POST | `/send-message`, `/send-seen` |
 | Number lookup | GET | `/check-number-status/{phone}` |
 | Media upload | POST | `/send-image`, `/send-file`, `/send-file-base64`, `/send-audio-base64`, `/send-voice`, `/send-voice-base64` |
+| Advanced media, source checkout | POST | `/send-video`, `/send-video-base64`, `/send-sticker`, `/send-sticker-gif` |
+| Structured messages, source checkout | POST | `/contact-vcard`, `/send-contact`, `/send-location`, `/send-poll-message` |
 | Media download | POST / GET | `/download-media` / `/get-media-by-message/{messageId}` |
 | Contacts and profile | GET | `/all-contacts`, `/contact/{phone}`, `/contact/pn-lid/{pnLid}`, `/profile-pic/{phone}`, `/profile-status/{phone}` |
 | Chats | GET | `/all-chats`, `/all-chats-archived`, `/chat-by-id/{phone}` |
@@ -257,6 +265,12 @@ from token generation, which checks `{secretkey}`.
 Group actions can partially succeed; inspect HTTP `207` and per-participant
 results before retrying. An existing route does not imply identical internal
 models or all advanced options from the Node server.
+
+Advanced sends stop on the first failure and return accepted IDs in `completed`
+with `failedRecipient`. A failed recipient can have unknown delivery status.
+Sticker routes require prepared WebP, including animated WebP for
+`send-sticker-gif`; they do not convert GIF input. See
+[formats, full examples and response contracts](docs/advanced-messages.md).
 
 ### Media, chats and presence examples
 
@@ -318,7 +332,7 @@ service. Containers in separate stacks need a shared network or a routable URL.
 | --- | --- |
 | `qrcode` | Pairing code in `urlcode`. |
 | `status-find` | Connection and lifecycle status. |
-| `onmessage` | Normalized incoming text/image/document/audio content. |
+| `onmessage` | Normalized text/image/document/audio and source additions: video, stickers, contact cards, location and poll metadata. |
 | `onparticipantschanged` | Group participant and administrator changes. |
 | `onaddedtogroup` | The account joined a group. |
 | `ongroupchange` | Group metadata and picture updates. |
@@ -384,7 +398,7 @@ guarantees that every individual WhatsApp session is connected.
 | Media descriptor cache | Up to 1,024 entries per session, with a 24-hour TTL; lost on restart. |
 | Chat index | Up to 10,000 entries and 64 recent message IDs per chat; metadata only. |
 | Presence cache | Up to 10,000 contacts per session, with a 5-minute observation TTL. |
-| Groups/directory JSON bodies | 64 KiB; media has separate size limits. |
+| Groups/directory/structured message JSON bodies | 64 KiB; media has separate size limits. |
 | Presence commands | Up to 100 destinations; optional duration 1-10,000 ms. |
 | Webhook payloads | At most 1 MiB serialized. |
 
@@ -399,7 +413,7 @@ session checks: `all-chats-with-messages`, `all-messages-in-chat`,
 `load-messages-in-chat` and `get-messages`. Label/community filters also return
 `501` when their unsupported options are requested.
 
-Native video/sticker/poll sending, reactions, edit/delete/quoted-message flows,
+Reactions, edit/delete/quoted-message flows, poll voting/results,
 status publishing, business-profile editing, WebSocket/broker integrations,
 external message persistence and S3/MinIO storage are not part of the current
 HTTP implementation. Their absence here is not a claim that whatsmeow cannot
@@ -498,6 +512,7 @@ currently available in Portuguese:
 | [OpenAPI export](docs/openapi.json) | Machine-readable routes, request/response schemas and explicit unsupported operations. |
 | [Docker and Portainer](docs/docker-portainer.pt-BR.md) | Deployment, stacks, pairing, updates and backups. |
 | [Media](docs/media.pt-BR.md) | Upload/download examples, MIME handling, voice requirements and limits. |
+| [Advanced native messages](docs/advanced-messages.md) | Video, static/animated WebP stickers, contact cards, locations, polls and complete examples. Source checkout additions. |
 | [Groups](docs/groups.pt-BR.md) | All group routes, partial results and events. |
 | [Contacts, chats and presence](docs/contacts-chats-presence.pt-BR.md) | PN/LID, metadata pagination, presence and observations. |
 | [Operations](docs/operation.pt-BR.md) | Restoration, disconnect/logout, shutdown, security boundaries and webhook behavior. |
@@ -515,11 +530,13 @@ features have been verified in its source and where our implementation differs.
 
 Completed baseline: session lifecycle and authentication; text/media;
 groups; contacts/chat metadata/presence; bounded webhooks; OpenAPI and multiarch CI.
+The next native-message stage is implemented in source: video/stickers,
+contacts/locations and poll creation, with normalized events and download support.
 
 Planned expansion, with exact scope and acceptance tests to be defined per delivery:
 
-1. Rich messaging: native video/stickers, contacts/locations, polls, reactions,
-   quoted messages and edit/delete flows, where the SDK supports them.
+1. Message actions/context: reactions, explicit read receipts, quoted messages,
+   mentions and edit/delete flows, where the SDK supports them.
 2. Durable message/history storage with pagination, retention and session isolation.
 3. Durable event delivery and optional WebSocket, RabbitMQ/NATS and storage adapters.
 4. Profile/privacy/blocklist operations and evaluation of status/community/newsletter features.

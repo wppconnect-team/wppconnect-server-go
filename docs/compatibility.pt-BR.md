@@ -1,6 +1,7 @@
 # Matriz de compatibilidade e validação
 
-Esta matriz descreve as capacidades publicadas a partir de `0.1.3`, sem afirmar paridade com todas as rotas
+Esta matriz descreve a base publicada em `0.1.3` e as adições no código-fonte,
+identificadas abaixo, sem afirmar paridade com todas as rotas
 ou estruturas internas do servidor Node. A referência de contrato é o checkout
 `wppconnect-server` v2.10.27 e o fork whatsmeow fixado no `go.mod`.
 
@@ -9,7 +10,8 @@ ou estruturas internas do servidor Node. A referência de contrato é o checkout
 | Autenticação | bcrypt, generate-token, Bearer bruto/URL-safe e session:token. | Sessão + segredo até 72 bytes para geração; tokens vinculados à sessão. | HTTP de bootstrap/autorização/isolamento; fixtures Node bcrypt 6.0.0 com Unicode e 72 bytes. |
 | Sessões | Início, status, QR, desconexão, logout, restauração e shutdown. | Nomes ASCII seguros de até 64 caracteres; no máximo 100 sessões vivas. | SQLite real, reabertura, legado, falha de logout, cancelamento e concorrência. |
 | Texto e leitura | Envio, consulta de número e rota send-seen do MVP. | Sem promessa de sincronização completa da caixa de entrada ou de todos os campos de retorno do Node. | Contrato de autenticação e documentação; sem conta WhatsApp real nesta entrega. |
-| Mídia | Imagem, arquivo, áudio/voz, normalização e download autorizado. | 16 MiB; cache limitado; sem transcodificação, vídeo, stickers ou leitura arbitrária de caminhos/URLs. | HTTP de envio/download, MIME/limites/isolamento, transporte simulado e descriptografia do SDK. |
+| Mídia base | Imagem, arquivo, áudio/voz, normalização e download autorizado. | 16 MiB; cache limitado; sem transcodificação ou leitura arbitrária de caminhos/URLs. | HTTP de envio/download, MIME/limites/isolamento, transporte simulado e descriptografia do SDK. |
+| Mensagens avançadas (código-fonte, fora de 0.1.3) | Vídeo MP4, stickers WebP estáticos/animados, vCards, localização e criação de enquetes; eventos e download de vídeo/sticker. | [Contrato completo](advanced-messages.md): vídeo/contatos explícitos são extensões Go; contact-vcard retorna array; send-sticker-gif recebe WebP animado já preparado. Sem conversão, localização ao vivo ou votos/resultados. | HTTP, limites de contêiner, segredos por destinatário, resultados parciais, OpenAPI/TCP, webhook, isolamento e descriptografia real do SDK. |
 | Grupos | 22 rotas, participantes/admins, metadados, convites, entrada/saída e foto. | Aprovação de entrada, erros por participante e resultados parciais preservados. | HTTP de sucesso, permissões, `207`, falhas, imagem e webhook. |
 | Contatos e perfil | Contatos sincronizados, associação PN/LID e consulta de status/foto. | Associação local e campos disponíveis no SDK; privacidade pode impedir consulta. | HTTP, alias PN/LID e falhas de protocolo simuladas. |
 | Chats | Metadados persistentes, filtros/paginação e eventos de app state. | Máximo 10.000 chats, 64 IDs recentes por chat; sem corpos históricos ou banco do navegador. | SQLite real, reinício, fora de ordem, deduplicação, filtros e isolamento. |
@@ -29,7 +31,8 @@ listar como funcionais rotas que sempre retornam `501`.
 O teste `TestOpenAPIValidAndExportCurrent` valida o documento com kin-openapi
 e detecta exportação desatualizada. `TestCapabilitiesE2EAgainstOpenAPI` usa TCP
 com o roteador HTTP real, valida requisições e respostas contra a especificação
-e cobre bootstrap, sondas, close/logout, grupos, mídia, contatos, chats e presença.
+e cobre bootstrap, sondas, close/logout, grupos, mídia, mensagens avançadas,
+contatos, chats e presença.
 O transporte WhatsApp é simulado. Testes específicos de cada capacidade cobrem
 falhas e limites com mais detalhes. Isso não comprova pareamento ou envio numa
 conta WhatsApp real; essa validação foi dispensada pelo usuário nesta entrega.

@@ -104,6 +104,7 @@ func (s *Server) router() http.Handler {
 		protected.Post("/api/{session}/send-audio-base64", s.sendAudio)
 		protected.Post("/api/{session}/download-media", s.downloadMedia)
 		protected.Get("/api/{session}/get-media-by-message/{messageId}", s.downloadMedia)
+		s.advancedRoutes(protected)
 		// Mirrors POST /api/:session/send-seen
 		protected.Post("/api/{session}/send-seen", s.sendSeen)
 		// Mirrors GET /api/:session/check-number-status/:phone

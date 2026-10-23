@@ -14,10 +14,8 @@ import (
 	"testing"
 
 	"go.mau.fi/whatsmeow"
-	"go.mau.fi/whatsmeow/proto/waE2E"
 	"go.mau.fi/whatsmeow/store"
 	"golang.org/x/crypto/hkdf"
-	"google.golang.org/protobuf/proto"
 )
 
 type roundTripFunc func(*http.Request) (*http.Response, error)
@@ -26,10 +24,17 @@ func (fn roundTripFunc) RoundTrip(r *http.Request) (*http.Response, error) { ret
 
 // Use the real SDK decryption path against an in-memory HTTP transport.
 func TestDownloadWithRealSDK(t *testing.T) {
+	for _, kind := range []Kind{Document, Video, Sticker} {
+		name := map[Kind]string{Document: "document", Video: "video", Sticker: "sticker"}[kind]
+		t.Run(name, func(t *testing.T) { testDownloadWithRealSDK(t, kind) })
+	}
+}
+
+func testDownloadWithRealSDK(t *testing.T, kind Kind) {
 	plain := []byte("verified document content")
 	key := bytes.Repeat([]byte{1}, 32)
 	keys := make([]byte, 112)
-	if _, err := io.ReadFull(hkdf.New(sha256.New, key, nil, []byte(whatsmeow.MediaDocument)), keys); err != nil {
+	if _, err := io.ReadFull(hkdf.New(sha256.New, key, nil, []byte(UploadType(kind))), keys); err != nil {
 		t.Fatal(err)
 	}
 	block, err := aes.NewCipher(keys[16:48])
@@ -59,9 +64,12 @@ func TestDownloadWithRealSDK(t *testing.T) {
 			cli.SetMediaHTTPClient(&http.Client{Transport: roundTripFunc(func(r *http.Request) (*http.Response, error) {
 				return &http.Response{StatusCode: tc.status, Header: make(http.Header), Body: io.NopCloser(bytes.NewReader(payload)), ContentLength: int64(len(payload)), Request: r}, nil
 			})})
-			a := Attachment{Length: uint64(len(plain)), Message: &waE2E.DocumentMessage{
-				URL: proto.String("https://mmg.whatsapp.net/fixture"), MediaKey: key, FileEncSHA256: encHash[:], FileSHA256: plainHash[:], FileLength: proto.Uint64(uint64(len(plain))),
-			}}
+			a, ok := attachment(Message(kind, whatsmeow.UploadResponse{
+				URL: "https://mmg.whatsapp.net/fixture", MediaKey: key, FileEncSHA256: encHash[:], FileSHA256: plainHash[:], FileLength: uint64(len(plain)),
+			}, "application/octet-stream", "fixture", ""))
+			if !ok {
+				t.Fatal("descriptor rejected")
+			}
 			got, err := Download(context.Background(), cli, a)
 			if tc.corrupt || tc.status != 200 {
 				if err == nil || got != nil {

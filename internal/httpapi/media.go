@@ -15,25 +15,32 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/wppconnect-team/wppconnect-server-go/internal/media"
 	"go.mau.fi/whatsmeow/types"
+	"google.golang.org/protobuf/proto"
 )
 
 type mediaRequest struct {
-	GroupID   json.RawMessage `json:"groupId"`
-	Phone     json.RawMessage `json:"phone"`
-	Base64    string          `json:"base64"`
-	Base64Ptt string          `json:"base64Ptt"`
-	Mimetype  string          `json:"mimetype"`
-	Filename  string          `json:"filename"`
-	Caption   string          `json:"caption"`
-	Message   string          `json:"message"`
-	Path      string          `json:"path"`
-	IsGroup   bool            `json:"isGroup"`
+	GroupID      json.RawMessage `json:"groupId"`
+	Phone        json.RawMessage `json:"phone"`
+	Base64       string          `json:"base64"`
+	Base64Ptt    string          `json:"base64Ptt"`
+	Mimetype     string          `json:"mimetype"`
+	Filename     string          `json:"filename"`
+	Caption      string          `json:"caption"`
+	Message      string          `json:"message"`
+	Path         string          `json:"path"`
+	IsGroup      bool            `json:"isGroup"`
+	IsLid        bool            `json:"isLid"`
+	IsNewsletter bool            `json:"isNewsletter"`
 }
 
 func (s *Server) sendImage(w http.ResponseWriter, r *http.Request) { s.sendMedia(w, r, media.Image) }
 func (s *Server) sendFile(w http.ResponseWriter, r *http.Request)  { s.sendMedia(w, r, media.Document) }
 func (s *Server) sendAudio(w http.ResponseWriter, r *http.Request) { s.sendMedia(w, r, media.Audio) }
 func (s *Server) sendVoice(w http.ResponseWriter, r *http.Request) { s.sendMedia(w, r, media.Voice) }
+func (s *Server) sendVideo(w http.ResponseWriter, r *http.Request) { s.sendMedia(w, r, media.Video) }
+func (s *Server) sendSticker(w http.ResponseWriter, r *http.Request) {
+	s.sendMedia(w, r, media.Sticker)
+}
 
 func mediaError(w http.ResponseWriter, err error, fallback string) {
 	code, message := http.StatusBadRequest, err.Error()
@@ -43,6 +50,8 @@ func mediaError(w http.ResponseWriter, err error, fallback string) {
 		code, message = http.StatusRequestEntityTooLarge, "request body exceeds "+strconv.FormatInt(maxBody.Limit, 10)+" bytes"
 	case errors.Is(err, media.ErrTooLarge):
 		code, message = http.StatusRequestEntityTooLarge, media.ErrTooLarge.Error()
+	case errors.Is(err, media.ErrStickerTooLarge):
+		code, message = http.StatusRequestEntityTooLarge, media.ErrStickerTooLarge.Error()
 	case errors.Is(err, context.DeadlineExceeded):
 		code, message = http.StatusGatewayTimeout, "media operation timed out"
 	case errors.Is(err, context.Canceled):
@@ -114,6 +123,14 @@ func readMedia(w http.ResponseWriter, r *http.Request) (mediaRequest, []byte, er
 			req.IsGroup, err = strconv.ParseBool(value)
 			if err != nil {
 				return req, nil, errors.New("invalid isGroup")
+			}
+		}
+		for key, target := range map[string]*bool{"isLid": &req.IsLid, "isNewsletter": &req.IsNewsletter} {
+			if value := r.FormValue(key); value != "" {
+				*target, err = strconv.ParseBool(value)
+				if err != nil {
+					return req, nil, errors.New("invalid " + key)
+				}
 			}
 		}
 		req.Filename, req.Caption, req.Message = r.FormValue("filename"), r.FormValue("caption"), r.FormValue("message")
@@ -194,6 +211,9 @@ func destinations(phone json.RawMessage, group bool) ([]types.JID, error) {
 		if user == "" || (hasServer && server != target && !(server == "c.us" && !group)) {
 			return nil, errors.New("invalid recipient JID")
 		}
+		if len(user) > 64 || strings.HasPrefix(user, "-") || strings.HasSuffix(user, "-") {
+			return nil, errors.New("invalid recipient length or group ID")
+		}
 		for _, c := range user {
 			if (c < '0' || c > '9') && !(group && c == '-') {
 				return nil, errors.New("phone must contain digits (and '-' for legacy group IDs)")
@@ -215,12 +235,32 @@ func (s *Server) sendMedia(w http.ResponseWriter, r *http.Request, kind media.Ki
 		mediaError(w, err, "")
 		return
 	}
+	if req.IsLid || req.IsNewsletter {
+		mediaError(w, errors.New("LID/newsletter destinations are not supported for media sends"), "")
+		return
+	}
 	recipients, err := destinations(req.Phone, req.IsGroup)
 	if err != nil {
 		mediaError(w, err, "")
 		return
 	}
 	mimetype, err := media.MIME(data, req.Mimetype, kind)
+	if err != nil {
+		mediaError(w, err, "")
+		return
+	}
+	var info media.Info
+	if kind == media.Video {
+		info, err = media.InspectVideo(data)
+	} else if kind == media.Sticker {
+		info, err = media.InspectSticker(data)
+		if err == nil && strings.HasSuffix(r.URL.Path, "/send-sticker-gif") && !info.Animated {
+			err = errors.New("send-sticker-gif requires animated WebP")
+		}
+		if err == nil && (req.Caption != "" || req.Message != "") {
+			err = errors.New("stickers do not support captions")
+		}
+	}
 	if err != nil {
 		mediaError(w, err, "")
 		return
@@ -241,9 +281,14 @@ func (s *Server) sendMedia(w http.ResponseWriter, r *http.Request, kind media.Ki
 	results := make([]map[string]any, 0, len(recipients))
 	for _, jid := range recipients {
 		msg := media.Message(kind, uploaded, mimetype, filename, caption)
+		if kind == media.Video {
+			msg.VideoMessage.Width, msg.VideoMessage.Height, msg.VideoMessage.Seconds = proto.Uint32(info.Width), proto.Uint32(info.Height), proto.Uint32(info.Seconds)
+		} else if kind == media.Sticker {
+			msg.StickerMessage.Width, msg.StickerMessage.Height, msg.StickerMessage.IsAnimated = proto.Uint32(info.Width), proto.Uint32(info.Height), proto.Bool(info.Animated)
+		}
 		resp, err := client.SendMessage(ctx, jid, msg)
 		if err != nil {
-			mediaError(w, err, "media send failed; earlier recipients may have received the message")
+			sendError(w, err, results, jid.String())
 			return
 		}
 		store.Remember(resp.ID, msg)

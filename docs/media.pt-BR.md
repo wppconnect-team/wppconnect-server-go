@@ -4,6 +4,10 @@ Esta etapa está disponível a partir da imagem publicada `0.1.3`, para Linux
 amd64 e arm64. A imagem antiga `0.1.2` não contém essas alterações.
 Veja o [guia do Portainer](docker-portainer.pt-BR.md) para implantação.
 
+O código-fonte também implementa vídeo, stickers, contatos, localização e
+enquetes. Essas adições não fazem parte da imagem `0.1.3`; consulte
+[mensagens avançadas](advanced-messages.md) para formatos, limites e exemplos.
+
 Todas as rotas abaixo exigem `Authorization: Bearer TOKEN` da sessão e uma
 sessão conectada. Os exemplos usam Bash, `curl`, `jq` e as variáveis
 `BASE_URL`, `SESSION` e `TOKEN` do guia de implantação.

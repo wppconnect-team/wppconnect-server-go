@@ -13,22 +13,25 @@ service implementations, startup wiring, storage models and configuration were
 inspected. A registered handler is evidence of source coverage, not evidence of
 successful delivery on every WhatsApp account or client.
 
-Our current-source baseline is [WPPConnect Server Go commit `1fbd26d`](https://github.com/wppconnect-team/wppconnect-server-go/tree/1fbd26d66802ee631e0bfb543ae2d5d5c0c04199).
+Our original comparison baseline is [WPPConnect Server Go commit `1fbd26d`](https://github.com/wppconnect-team/wppconnect-server-go/tree/1fbd26d66802ee631e0bfb543ae2d5d5c0c04199).
 The capability baseline shipped in [release `v0.1.3`](https://github.com/wppconnect-team/wppconnect-server-go/releases/tag/v0.1.3);
 the current-source revision also includes subsequent dependency updates.
-Its exported [OpenAPI contract](openapi.json) contains
-59 implemented operations and eight explicit unsupported operations. Its route
+That revision had 59 implemented operations and eight explicit unsupported
+operations. The current source adds native advanced messaging and its exported
+[OpenAPI contract](openapi.json) has 67 implemented operations, with the same
+eight explicit unsupported operations. The advanced additions require a source
+build or a subsequent release, and are not included in `0.1.3`. Our route
 and payload contract targets WPPConnect Node compatibility, while Evolution uses
 different route groups and instance API keys. These are different API contracts.
 Compare capabilities before comparing endpoint counts.
 
 ## Verified capability comparison
 
-| Area | Evolution Go source at the pinned revision | WPPConnect Server Go baseline | Follow-up opportunity |
+| Area | Evolution Go source at the pinned revision | WPPConnect Server Go current source | Follow-up opportunity |
 | --- | --- | --- | --- |
 | Sessions | Admin instance CRUD, logs, proxy settings and forced reconnect; instance connect, QR, phone pairing, reconnect, logout and advanced settings. [Routes](https://github.com/evolution-foundation/evolution-go/blob/9337afc47e10b86cc896a6f432240e40fee95dd1/pkg/routes/routes.go#L80-L109) | QR linking, status, disconnect versus logout, persisted restoration and graceful shutdown. [Operation guide](operation.pt-BR.md) | Phone pairing, authenticated administration and per-session proxy/settings. |
-| Text and media | Text, links, uploaded/URL media and video protocol messages have service implementations. [Sending service](https://github.com/evolution-foundation/evolution-go/blob/9337afc47e10b86cc896a6f432240e40fee95dd1/pkg/sendMessage/service/send_service.go#L604-L1530) | Text, image, document, audio and voice; authenticated download; bounded base64/multipart input. [Media guide](media.pt-BR.md) | Video, explicit quote/mention/context options and link previews. Evaluate URL ingestion separately with bounded fetching. |
-| Additional message types | Poll creation, URL-to-WebP stickers, locations and contact cards construct protocol messages. [Implementations](https://github.com/evolution-foundation/evolution-go/blob/9337afc47e10b86cc896a6f432240e40fee95dd1/pkg/sendMessage/service/send_service.go#L1531-L1721) | These send operations are absent from our contract. | Prioritize native message types with validation, limits and normalization tests. |
+| Text and media | Text, links, uploaded/URL media and video protocol messages have service implementations. [Sending service](https://github.com/evolution-foundation/evolution-go/blob/9337afc47e10b86cc896a6f432240e40fee95dd1/pkg/sendMessage/service/send_service.go#L604-L1530) | Text, image, document, audio, voice and native MP4 video; authenticated download; bounded base64/multipart input. [Media guide](media.pt-BR.md), [advanced messages](advanced-messages.md) | Explicit quote/mention/context options and link previews. Evaluate URL ingestion separately with bounded fetching. |
+| Additional message types | Poll creation, URL-to-WebP stickers, locations and contact cards construct protocol messages. [Implementations](https://github.com/evolution-foundation/evolution-go/blob/9337afc47e10b86cc896a6f432240e40fee95dd1/pkg/sendMessage/service/send_service.go#L1531-L1721) | Native poll creation, prepared static/animated WebP stickers, static locations and single/multiple contact cards, with bounded input and normalized events. [Contract and tests](advanced-messages.md) | Image-to-sticker conversion, live location and poll vote/results require separate work. No remote URL ingestion. |
 | Message actions | Reaction, played/read receipts, deletion for everyone and text editing are registered; services construct reaction/revoke/edit messages. [Routes](https://github.com/evolution-foundation/evolution-go/blob/9337afc47e10b86cc896a6f432240e40fee95dd1/pkg/routes/routes.go#L147-L160), [service](https://github.com/evolution-foundation/evolution-go/blob/9337afc47e10b86cc896a6f432240e40fee95dd1/pkg/message/service/message_service.go#L136-L203), [revoke/edit](https://github.com/evolution-foundation/evolution-go/blob/9337afc47e10b86cc896a6f432240e40fee95dd1/pkg/message/service/message_service.go#L467-L526) | Basic mark-read and media download. | Reactions, explicit receipt IDs, edit/revoke authorization and delivery-receipt events. |
 | Groups | Group metadata, participants, creation, invites, settings and join/leave. [Routes](https://github.com/evolution-foundation/evolution-go/blob/9337afc47e10b86cc896a6f432240e40fee95dd1/pkg/routes/routes.go#L174-L191) | 22 group operations including partial participant results and normalized events. [Group guide](groups.pt-BR.md) | Preserve partial-result and permission semantics while extending capabilities. |
 | Contacts and account | Contact/user/avatar lookups, privacy settings, blocklist and own profile mutation. [Routes](https://github.com/evolution-foundation/evolution-go/blob/9337afc47e10b86cc896a6f432240e40fee95dd1/pkg/routes/routes.go#L129-L146), [services](https://github.com/evolution-foundation/evolution-go/blob/9337afc47e10b86cc896a6f432240e40fee95dd1/pkg/user/service/user_service.go#L394-L542) | Contact/profile lookup and PN/LID association; presence observation/publication and typing/recording. [Directory guide](contacts-chats-presence.pt-BR.md) | Privacy, blocking and own profile updates are separate future scope. |

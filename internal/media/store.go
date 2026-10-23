@@ -97,6 +97,8 @@ func Unwrap(msg *waE2E.Message) *waE2E.Message {
 			inner = msg.GetViewOnceMessageV2().GetMessage()
 		case msg.GetViewOnceMessageV2Extension().GetMessage() != nil:
 			inner = msg.GetViewOnceMessageV2Extension().GetMessage()
+		case msg.GetPollCreationMessageV4().GetMessage() != nil:
+			inner = msg.GetPollCreationMessageV4().GetMessage()
 		default:
 			return msg
 		}
@@ -123,6 +125,10 @@ func attachment(msg *waE2E.Message) (Attachment, bool) {
 		filename = msg.GetDocumentMessage().GetFileName()
 	case msg.GetAudioMessage() != nil:
 		source, kind = msg.GetAudioMessage(), Audio
+	case msg.GetVideoMessage() != nil:
+		source, kind = msg.GetVideoMessage(), Video
+	case msg.GetStickerMessage() != nil:
+		source, kind = msg.GetStickerMessage(), Sticker
 	default:
 		return Attachment{}, false
 	}
@@ -161,6 +167,10 @@ func attachment(msg *waE2E.Message) (Attachment, bool) {
 		downloadable = minimal.DocumentMessage
 	case Audio:
 		downloadable = minimal.AudioMessage
+	case Video:
+		downloadable = minimal.VideoMessage
+	case Sticker:
+		downloadable = minimal.StickerMessage
 	}
 	return Attachment{Message: downloadable, Mimetype: source.GetMimetype(), Filename: Filename(filename), Length: u.FileLength}, true
 }
