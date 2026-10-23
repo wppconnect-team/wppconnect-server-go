@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"github.com/wppconnect-team/wppconnect-server-go/internal/directory"
+	"github.com/wppconnect-team/wppconnect-server-go/internal/history"
 	"github.com/wppconnect-team/wppconnect-server-go/internal/media"
 
 	"go.mau.fi/whatsmeow"
@@ -53,6 +54,7 @@ type Handle struct {
 	Client    *whatsmeow.Client
 	Media     *media.Store
 	Directory *directory.State
+	History   *history.Store
 
 	mu        sync.RWMutex
 	status    Status
@@ -65,6 +67,7 @@ type Handle struct {
 	events    sync.RWMutex
 	closing   bool
 	workers   sync.WaitGroup
+	settings  Settings
 }
 
 // GetStatus returns the handle's current status.
@@ -132,20 +135,21 @@ var (
 
 // Manager owns all live sessions, keyed by name.
 type Manager struct {
-	mu           sync.RWMutex
-	sessions     map[string]*Handle
-	dataDir      string
-	sink         EventSink
-	log          waLog.Logger
-	op           sync.Mutex
-	ctx          context.Context
-	cancel       context.CancelFunc
-	stopping     atomic.Bool
-	restoring    atomic.Bool
-	shutdownOnce sync.Once
-	shutdownDone chan struct{}
-	shutdownErr  error
-	open         func(context.Context, string) (*Handle, error)
+	mu             sync.RWMutex
+	sessions       map[string]*Handle
+	dataDir        string
+	sink           EventSink
+	log            waLog.Logger
+	op             sync.Mutex
+	ctx            context.Context
+	cancel         context.CancelFunc
+	stopping       atomic.Bool
+	restoring      atomic.Bool
+	shutdownOnce   sync.Once
+	shutdownDone   chan struct{}
+	shutdownErr    error
+	open           func(context.Context, string) (*Handle, error)
+	historyOptions history.Options
 }
 
 // NewManager creates a session manager backed by one SQLite store per session.
@@ -161,6 +165,7 @@ func NewManager(ctx context.Context, dataDir string, sink EventSink) (*Manager, 
 		sink:     sink,
 		log:      logger,
 		ctx:      life, cancel: cancel, shutdownDone: make(chan struct{}),
+		historyOptions: history.DefaultOptions(),
 	}
 	m.open = m.openHandle
 	return m, nil
@@ -248,10 +253,28 @@ func (m *Manager) openHandle(ctx context.Context, name string) (*Handle, error) 
 		return nil, fmt.Errorf("open chat index: %w", err)
 	}
 	client := whatsmeow.NewClient(deviceStore, m.log)
+	if err = ValidateSettings(record.Settings); err != nil {
+		index.Close()
+		container.Close()
+		return nil, err
+	}
+	if record.Settings.ProxyURL != "" {
+		if err = client.SetProxyAddress(record.Settings.ProxyURL); err != nil {
+			index.Close()
+			container.Close()
+			return nil, errors.New("session proxy configuration failed")
+		}
+	}
+	archive, err := history.Open(filepath.Join(m.dataDir, name+".history.db"), m.historyOptions)
+	if err != nil {
+		index.Close()
+		container.Close()
+		return nil, fmt.Errorf("open message history: %w", err)
+	}
 	client.BackgroundEventCtx = ctx
 	client.InitialAutoReconnect = deviceStore.ID != nil
 	return &Handle{Name: name, Client: client, runtime: client, container: container, paired: deviceStore.ID != nil,
-		Media: media.NewStore(), Directory: directory.NewState(index), status: StatusInitializing}, nil
+		Media: media.NewStore(), History: archive, Directory: directory.NewState(index), settings: record.Settings, status: StatusInitializing}, nil
 }
 
 // Start creates (or reuses) a session and begins connecting. It registers the
@@ -289,7 +312,14 @@ func (m *Manager) startLocked(ctx context.Context, name string) (*Handle, error)
 		return nil, err
 	}
 	h.ctx, h.cancel = life, cancel
-	if err = m.writeRecord(sessionRecord{Name: name, Restore: true}); err != nil {
+	record, recordErr := m.readRecord(name)
+	if recordErr != nil {
+		m.release(h)
+		return nil, recordErr
+	}
+	record.Restore = true
+	record.Revoked = false
+	if err = m.writeRecord(record); err != nil {
 		m.release(h)
 		return nil, err
 	}
@@ -313,6 +343,11 @@ func (m *Manager) startLocked(ctx context.Context, name string) (*Handle, error)
 		case *events.Connected:
 			h.SetStatus(StatusConnected)
 			h.SetQRCode("")
+			if h.Settings().AlwaysOnline && h.Client != nil {
+				ctx, cancel := context.WithTimeout(h.ctx, 10*time.Second)
+				h.Client.SendPresence(ctx, types.PresenceAvailable)
+				cancel()
+			}
 			if m.sink != nil {
 				m.sink.OnConnected(name)
 			}
@@ -330,11 +365,41 @@ func (m *Manager) startLocked(ctx context.Context, name string) (*Handle, error)
 			go m.permanent(h, revoked)
 		case *events.Message:
 			m.forwardMessage(h, v)
+		case *events.Receipt:
+			if h.History != nil {
+				ctx, cancel := context.WithTimeout(h.ctx, 10*time.Second)
+				err := h.History.Receipt(ctx, v)
+				cancel()
+				if err != nil && m.log != nil {
+					m.log.Warnf("receipt persistence failed: %v", err)
+				}
+			}
+			m.forwardProtocolEvent(h, v)
 		case *events.GroupInfo, *events.JoinedGroup, *events.Picture:
 			m.observeDirectory(h, v)
 			m.forwardGroupEvent(name, v)
-		case *events.HistorySync, *events.Archive, *events.Pin, *events.MarkChatAsRead, *events.DeleteChat, *events.Presence, *events.ChatPresence:
+			if _, ok := evt.(*events.Picture); ok {
+				m.forwardProtocolEvent(h, evt)
+			}
+		case *events.HistorySync, *events.Archive, *events.Pin, *events.Mute, *events.MarkChatAsRead, *events.DeleteChat, *events.Presence, *events.ChatPresence:
+			if historyEvent, ok := evt.(*events.HistorySync); ok {
+				m.importHistory(h, historyEvent)
+			}
 			m.forwardDirectoryEvent(h, v)
+		case *events.LabelEdit, *events.LabelAssociationChat, *events.LabelAssociationMessage:
+			if h.History != nil {
+				ctx, cancel := context.WithTimeout(h.ctx, 10*time.Second)
+				err := h.History.ObserveLabels(ctx, evt)
+				cancel()
+				if err != nil && m.log != nil {
+					m.log.Warnf("label persistence failed: %v", err)
+				}
+			}
+			m.forwardProtocolEvent(h, evt)
+		case *events.CallOffer, *events.CallAccept, *events.CallTerminate, *events.CallReject, *events.NewsletterJoin, *events.NewsletterLeave, *events.NewsletterMuteChange, *events.NewsletterLiveUpdate:
+			m.forwardProtocolEvent(h, evt)
+		case *events.PrivacySettings, *events.Blocklist, *events.UserAbout:
+			m.forwardProtocolEvent(h, evt)
 		}
 	})
 
@@ -400,6 +465,31 @@ func (m *Manager) forwardMessage(h *Handle, evt *events.Message) {
 		return
 	}
 	m.observeDirectory(h, evt)
+	if h.History != nil {
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		message := evt.Message
+		if message == nil {
+			message = evt.RawMessage
+		}
+		if err := h.History.Put(ctx, evt.Info, message); err != nil && m.log != nil {
+			m.log.Warnf("message history update failed: %v", err)
+		}
+		m.applyMessageChange(ctx, h, evt)
+		if message.GetPollUpdateMessage() != nil && h.Client != nil {
+			vote, err := h.Client.DecryptPollVote(ctx, evt)
+			if err == nil {
+				voter := evt.Info.Sender.ToNonAD()
+				if evt.Info.SenderAlt.Server == types.DefaultUserServer {
+					voter = evt.Info.SenderAlt.ToNonAD()
+				}
+				err = h.History.Vote(ctx, evt.Info.Chat.String(), message.GetPollUpdateMessage().GetPollCreationMessageKey().GetID(), voter.String(), message.GetPollUpdateMessage().GetSenderTimestampMS(), vote.GetSelectedOptions())
+			}
+			if err != nil && m.log != nil {
+				m.log.Warnf("poll vote unavailable: %v", err)
+			}
+		}
+		cancel()
+	}
 	// Register before dispatch so webhook consumers can download immediately.
 	message := evt.Message
 	if message == nil {
@@ -408,6 +498,18 @@ func (m *Manager) forwardMessage(h *Handle, evt *events.Message) {
 	h.Media.Remember(evt.Info.ID, message)
 	if m.sink != nil {
 		m.sink.OnMessage(h.Name, evt)
+	}
+	if h.Settings().AutoRead && !evt.Info.IsFromMe && h.Client != nil && evt.Info.ID != "" {
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		sender := evt.Info.Sender
+		if !evt.Info.IsGroup {
+			sender = types.EmptyJID
+		}
+		err := h.Client.MarkRead(ctx, []types.MessageID{evt.Info.ID}, time.Now(), evt.Info.Chat, sender)
+		if err == nil && h.History != nil {
+			h.History.MarkRead(ctx, evt.Info.Chat.String(), []string{evt.Info.ID})
+		}
+		cancel()
 	}
 }
 
@@ -445,8 +547,11 @@ func (m *Manager) release(h *Handle) error {
 	}
 	h.workers.Wait()
 	var err error
+	if h.History != nil {
+		err = h.History.Close()
+	}
 	if h.Directory != nil {
-		err = h.Directory.Close()
+		err = errors.Join(err, h.Directory.Close())
 	}
 	if h.container != nil {
 		err = errors.Join(err, h.container.Close())
@@ -499,7 +604,7 @@ func (m *Manager) Logout(ctx context.Context, name string) error {
 	if err := h.runtime.Logout(ctx); err != nil {
 		return err
 	}
-	err := m.writeRecord(sessionRecord{Name: name, Revoked: true})
+	err := m.writeRecord(sessionRecord{Name: name, Revoked: true, Settings: h.Settings()})
 	m.status(h, StatusUnpaired)
 	err = errors.Join(err, m.release(h))
 	m.mu.Lock()
@@ -514,7 +619,7 @@ func (m *Manager) permanent(h *Handle, revoked bool) {
 	if current, ok := m.Get(h.Name); !ok || current != h {
 		return
 	}
-	if err := m.writeRecord(sessionRecord{Name: h.Name, Revoked: revoked}); err != nil {
+	if err := m.writeRecord(sessionRecord{Name: h.Name, Revoked: revoked, Settings: h.Settings()}); err != nil {
 		m.log.Errorf("persist session stop: %v", err)
 	}
 	if err := m.release(h); err != nil {

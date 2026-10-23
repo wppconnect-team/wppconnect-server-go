@@ -77,5 +77,5 @@ func ChatData(c Chat) map[string]any {
 	jid, _ := types.ParseJID(c.JID)
 	return map[string]any{"id": groups.WID(jid), "name": c.Name, "formattedTitle": c.Name, "isGroup": jid.Server == types.GroupServer,
 		"isUser": jid.Server != types.GroupServer, "t": c.T, "unreadCount": c.Unread, "unreadCountIsPartial": !c.UnreadKnown,
-		"archive": c.Archived, "isArchived": c.Archived, "pin": c.Pinned}
+		"archive": c.Archived, "isArchived": c.Archived, "pin": c.Pinned, "isMuted": c.Muted, "muteUntil": c.MuteUntil}
 }

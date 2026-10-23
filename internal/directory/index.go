@@ -23,6 +23,9 @@ type Chat struct {
 	UnreadKnown bool
 	Archived    bool
 	Pinned      bool
+	Muted       bool
+	MuteUntil   int64
+	MuteAt      int64
 	ArchiveAt   int64
 	PinAt       int64
 	ReadAt      int64
@@ -160,6 +163,17 @@ func (s *Index) Message(ctx context.Context, evt *events.Message) error {
 
 func (s *Index) Event(ctx context.Context, evt any) error {
 	switch v := evt.(type) {
+	case *events.Mute:
+		if v == nil || v.Action == nil {
+			return nil
+		}
+		return s.Update(ctx, v.JID, func(c *Chat) {
+			if v.Timestamp.Unix() >= c.MuteAt {
+				c.Muted = v.Action.GetMuted()
+				c.MuteUntil = v.Action.GetMuteEndTimestamp()
+				c.MuteAt = v.Timestamp.Unix()
+			}
+		})
 	case *events.HistorySync:
 		if v == nil || v.Data == nil {
 			return nil

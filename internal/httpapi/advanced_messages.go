@@ -158,12 +158,13 @@ func (s *Server) sendAdvanced(w http.ResponseWriter, r *http.Request) {
 	defer cancel()
 	results := make([]map[string]any, 0, len(recipients))
 	for _, jid := range recipients {
-		response, err := client.SendMessage(ctx, jid, build())
+		message := build()
+		response, err := client.SendMessage(ctx, jid, message)
 		if err != nil {
 			sendError(w, err, results, jid.String())
 			return
 		}
-		s.observeSent(cleanSession(chi.URLParam(r, "session")), jid, response.ID, response.Timestamp)
+		s.observeSent(cleanSession(chi.URLParam(r, "session")), jid, response.ID, response.Timestamp, message)
 		results = append(results, map[string]any{"id": response.ID, "to": jid.String(), "type": kind})
 	}
 	writeJSON(w, status, map[string]any{"status": "success", "response": results, "mapper": "return"})

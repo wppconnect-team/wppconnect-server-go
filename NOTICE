@@ -1,0 +1,10 @@
+WPPConnect Server Go
+Copyright 2026 WPPConnect Team and contributors
+
+This project is licensed under Apache License 2.0. Third-party components retain
+their own licenses. See third_party/licenses.txt for dependency notices.
+
+The whatsmeow implementation is replaced by the WPPConnect fork, distributed
+under Mozilla Public License 2.0. Source for the exact dependency version is
+available at the repository and version recorded in go.mod and in the notices.
+No source code from Evolution Go is included.

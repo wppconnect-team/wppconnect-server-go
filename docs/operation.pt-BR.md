@@ -1,5 +1,11 @@
 # Operação e ciclo de sessão
 
+> Source expansion update: the historical baseline below is superseded for
+> message history, labels/community filters, durable events and administration
+> by the [current English guide](roadmap-completion.md). New capabilities require
+> a build containing this change. Experimental/unsupported features remain explicit.
+
+
 Estes recursos estão disponíveis a partir da imagem publicada `0.1.3`, para
 Linux amd64 e arm64. A tag antiga `0.1.2` mantém o comportamento anterior.
 Os testes automatizados usam transporte simulado, sem validação com conta real.

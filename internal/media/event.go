@@ -46,6 +46,29 @@ func Event(evt *events.Message) map[string]any {
 		out["body"] = msg.GetExtendedTextMessage().GetText()
 	}
 	switch {
+	case msg.GetReactionMessage() != nil:
+		m := msg.GetReactionMessage()
+		out["type"], out["body"], out["messageId"] = "reaction", bounded(m.GetText(), 64), bounded(m.GetKey().GetID(), 256)
+	case msg.GetProtocolMessage() != nil:
+		m := msg.GetProtocolMessage()
+		out["type"] = "protocol"
+		if m.GetType() == waE2E.ProtocolMessage_REVOKE {
+			out["type"] = "revoked"
+		}
+		if m.GetType() == waE2E.ProtocolMessage_MESSAGE_EDIT {
+			out["type"] = "edited"
+			out["body"] = bounded(m.GetEditedMessage().GetConversation(), 65536)
+			if m.GetEditedMessage().GetExtendedTextMessage() != nil {
+				out["body"] = bounded(m.GetEditedMessage().GetExtendedTextMessage().GetText(), 65536)
+			}
+		}
+		out["messageId"] = bounded(m.GetKey().GetID(), 256)
+	case msg.GetButtonsResponseMessage() != nil:
+		m := msg.GetButtonsResponseMessage()
+		out["type"], out["selectedId"], out["body"] = "buttons_response", bounded(m.GetSelectedButtonID(), 128), bounded(m.GetSelectedDisplayText(), 1024)
+	case msg.GetListResponseMessage() != nil:
+		m := msg.GetListResponseMessage()
+		out["type"], out["selectedId"], out["body"] = "list_response", bounded(m.GetSingleSelectReply().GetSelectedRowID(), 128), bounded(m.GetTitle(), 1024)
 	case msg.GetVideoMessage() != nil:
 		m := msg.GetVideoMessage()
 		out["type"], out["body"], out["caption"] = "video", m.GetCaption(), m.GetCaption()

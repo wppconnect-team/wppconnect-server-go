@@ -1,0 +1,27 @@
+# Isolated local/CI fixtures. Never use these credentials for production.
+services:
+  nats:
+    image: nats:2-alpine
+    ports: ["127.0.0.1:14222:4222"]
+  rabbitmq:
+    image: rabbitmq:4-alpine
+    ports: ["127.0.0.1:15673:5672"]
+    environment:
+      RABBITMQ_DEFAULT_USER: integration
+      RABBITMQ_DEFAULT_PASS: integration-only-password
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+  minio:
+    image: cgr.dev/chainguard/minio@sha256:d88920d6a50bd0b088223b688be3b76c63e6205dbe494437f67ba1240ea12880
+    user: "0:0"
+    command: server /data
+    volumes: ["minio-test-data:/data"]
+    ports: ["127.0.0.1:19000:9000"]
+    environment:
+      MINIO_ROOT_USER: integration
+      MINIO_ROOT_PASSWORD: integration-only-password
+volumes:
+  minio-test-data:

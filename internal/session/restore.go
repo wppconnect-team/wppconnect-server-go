@@ -15,9 +15,10 @@ import (
 )
 
 type sessionRecord struct {
-	Name    string `json:"name"`
-	Restore bool   `json:"restore"`
-	Revoked bool   `json:"revoked,omitempty"`
+	Name     string   `json:"name"`
+	Restore  bool     `json:"restore"`
+	Revoked  bool     `json:"revoked,omitempty"`
+	Settings Settings `json:"settings,omitempty"`
 }
 
 func (m *Manager) readRecord(name string) (sessionRecord, error) {

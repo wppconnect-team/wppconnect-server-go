@@ -10,3 +10,4 @@ server.exe
 userDataDir
 data
 graphify-out
+.tmp

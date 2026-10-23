@@ -1,5 +1,11 @@
 # Contatos, chats e presença
 
+> Source expansion update: the historical baseline below is superseded for
+> message history, labels/community filters, durable events and administration
+> by the [current English guide](roadmap-completion.md). New capabilities require
+> a build containing this change. Experimental/unsupported features remain explicit.
+
+
 Esta etapa está disponível a partir da imagem publicada `0.1.3`, para Linux
 amd64 e arm64. A imagem antiga `0.1.2` não inclui esses recursos.
 Veja o [guia do Portainer](docker-portainer.pt-BR.md).
