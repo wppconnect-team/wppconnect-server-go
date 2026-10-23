@@ -1,5 +1,11 @@
 # Matriz de compatibilidade e validação
 
+> Source expansion update: the historical baseline below is superseded for
+> message history, labels/community filters, durable events and administration
+> by the [current English guide](roadmap-completion.md). New capabilities require
+> a build containing this change. Experimental/unsupported features remain explicit.
+
+
 Esta matriz descreve a base publicada em `0.1.3` e as adições no código-fonte,
 identificadas abaixo, sem afirmar paridade com todas as rotas
 ou estruturas internas do servidor Node. A referência de contrato é o checkout

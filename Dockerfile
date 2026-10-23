@@ -1,5 +1,5 @@
 # syntax=docker/dockerfile:1
-FROM --platform=$BUILDPLATFORM golang:1.25-alpine AS build
+FROM --platform=$BUILDPLATFORM golang:1.26-alpine AS build
 ARG TARGETOS
 ARG TARGETARCH
 WORKDIR /src
@@ -15,6 +15,8 @@ RUN apk add --no-cache ca-certificates
 WORKDIR /app
 COPY --from=build /out/server /app/server
 COPY --from=build /out/token /app/token
+COPY LICENSE NOTICE /app/
+COPY third_party /app/third_party
 ENV PORT=21465 DATA_DIR=/data
 VOLUME ["/data"]
 EXPOSE 21465

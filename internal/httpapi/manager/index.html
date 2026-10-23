@@ -1,0 +1,468 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <meta name="color-scheme" content="light" />
+    <title>WPPConnect Console</title>
+    <link rel="stylesheet" href="/manager/styles.css" />
+    <script src="/manager/app.js" defer></script>
+  </head>
+  <body>
+    <a class="skip" href="#workspace">Skip to content</a>
+    <section id="login" class="login-shell">
+      <div class="login-card">
+        <div class="brand">
+          <span class="mark" aria-hidden="true">W</span
+          ><span
+            >WPPConnect<span class="brand-sub">Operations console</span></span
+          >
+        </div>
+        <div class="eyebrow">ADMINISTRATOR ACCESS</div>
+        <h1>Your messaging<br />operations, together.</h1>
+        <p class="muted">
+          Manage sessions, inspect delivery and work with your observed message
+          history.
+        </p>
+        <form id="login-form">
+          <label for="admin-token">Admin token</label
+          ><input
+            id="admin-token"
+            type="password"
+            required
+            autocomplete="off"
+            spellcheck="false"
+            aria-describedby="login-help login-error"
+          />
+          <p id="login-help" class="hint">
+            Use the administrator token configured for this server.
+          </p>
+          <button class="primary full" type="submit">
+            Open console <span aria-hidden="true">↗</span>
+          </button>
+          <p id="login-error" role="alert"></p>
+        </form>
+        <div class="login-foot">
+          <span class="dot"></span> Browser-free WhatsApp infrastructure
+        </div>
+      </div>
+      <aside class="login-note">
+        <span>WPP / GO</span>
+        <p>A direct connection.<br />A clear view.</p>
+        <small>Sessions · Messages · Events</small>
+      </aside>
+    </section>
+    <div id="app" class="app" hidden>
+      <aside class="sidebar">
+        <div class="brand">
+          <span class="mark" aria-hidden="true">W</span
+          ><span
+            >WPPConnect<span class="brand-sub">Operations console</span></span
+          >
+        </div>
+        <div class="nav-label">WORKSPACE</div>
+        <nav aria-label="Workspace">
+          <button data-page="overview" aria-current="page">
+            Overview <span>01</span></button
+          ><button data-page="sessions">Sessions <span>02</span></button
+          ><button data-page="events">Event log <span>03</span></button
+          ><button data-page="history">Messages <span>04</span></button
+          ><button data-page="settings">Settings <span>05</span></button>
+        </nav>
+        <div class="sidebar-foot">
+          <span class="dot"></span> whatsmeow runtime<a
+            href="/openapi.json"
+            target="_blank"
+            rel="noopener noreferrer"
+            >OpenAPI reference ↗</a
+          ><small>WPPConnect Server Go</small>
+        </div>
+      </aside>
+      <main id="workspace" class="workspace">
+        <header class="topbar">
+          <div>
+            <div class="eyebrow">WPP / CONTROL PLANE</div>
+            <h1 id="page-title" tabindex="-1">Overview</h1>
+          </div>
+          <div class="toolbar">
+            <span class="pill neutral">Administrator</span
+            ><button id="refresh" class="secondary">Refresh</button
+            ><button id="logout" class="quiet">Sign out</button>
+          </div>
+        </header>
+        <div id="notice" role="status" aria-live="polite" hidden></div>
+        <section id="overview" class="page">
+          <div class="intro">
+            <div>
+              <h2>A clear view of your connections.</h2>
+              <p class="muted">
+                Live sessions and durable delivery, in one place.
+              </p>
+            </div>
+            <span id="updated" class="hint">Waiting for server</span>
+          </div>
+          <div class="metrics">
+            <article class="metric">
+              <span>Sessions</span><strong id="metric-total">0</strong
+              ><small>Configured on this server</small>
+            </article>
+            <article class="metric">
+              <span>Connected</span><strong id="metric-connected">0</strong
+              ><small><span class="dot"></span> Ready for messaging</small>
+            </article>
+            <article class="metric">
+              <span>Pending deliveries</span
+              ><strong id="metric-pending">0</strong
+              ><small>Durable outbox work</small>
+            </article>
+            <article class="metric">
+              <span>Failed deliveries</span><strong id="metric-failed">0</strong
+              ><small>Available for manual replay</small>
+            </article>
+          </div>
+          <div class="overview-grid">
+            <article class="panel">
+              <div class="panel-heading">
+                <div>
+                  <span class="eyebrow">CONNECTIONS</span>
+                  <h2>Session health</h2>
+                </div>
+                <button data-jump="sessions" class="quiet">
+                  Manage sessions ↗
+                </button>
+              </div>
+              <div id="health-list" class="health-list"></div>
+            </article>
+            <article class="panel">
+              <span class="eyebrow">BUILT FOR OPERATIONS</span>
+              <h2>Messages with a trail.</h2>
+              <p class="muted">
+                Inspect observed history, find message IDs and replay retained
+                events with the same delivery identity.
+              </p>
+              <div class="guide-row">
+                <span>01</span>
+                <div>
+                  <strong>Connect a session</strong>
+                  <p>Start a session and pair by QR or phone.</p>
+                </div>
+              </div>
+              <div class="guide-row">
+                <span>02</span>
+                <div>
+                  <strong>Inspect the event log</strong>
+                  <p>Review retained events for each session.</p>
+                </div>
+              </div>
+              <div class="guide-row">
+                <span>03</span>
+                <div>
+                  <strong>Keep delivery accountable</strong>
+                  <p>Check metrics and replay failed work.</p>
+                </div>
+              </div>
+              <button data-jump="events" class="secondary">
+                Explore events ↗
+              </button>
+            </article>
+          </div>
+        </section>
+        <section id="sessions" class="page" hidden>
+          <div class="intro">
+            <div>
+              <h2>Your session workspace</h2>
+              <p class="muted">
+                Closing preserves pairing. Logging out revokes the linked
+                device.
+              </p>
+            </div>
+          </div>
+          <div class="panel">
+            <div class="panel-heading">
+              <h2>Sessions</h2>
+              <label class="search-label" for="session-search"
+                >Filter
+                <input
+                  id="session-search"
+                  type="search"
+                  placeholder="Session name"
+              /></label>
+            </div>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Name</th>
+                    <th>Status</th>
+                    <th>Configuration</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody id="session-rows"></tbody>
+              </table>
+            </div>
+            <div id="session-empty" class="empty" hidden>
+              <div class="empty-symbol" aria-hidden="true">+</div>
+              <h3>A fresh workspace.</h3>
+              <p>Create a session below to get started.</p>
+            </div>
+          </div>
+          <div class="two-col">
+            <article class="panel">
+              <h2>Create a session</h2>
+              <p class="muted">
+                Names can contain letters, numbers, underscores and hyphens.
+              </p>
+              <form id="create-form" class="form-grid">
+                <label for="new-name">Session name</label
+                ><input
+                  id="new-name"
+                  required
+                  maxlength="64"
+                  pattern="[A-Za-z0-9_-]{1,64}"
+                  placeholder="support-team"
+                /><button class="primary" type="submit">
+                  Create and start
+                </button>
+              </form>
+            </article>
+            <article class="panel">
+              <h2>Pair by phone</h2>
+              <p class="muted">
+                Enter the code shown here in WhatsApp's linked-device flow.
+              </p>
+              <form id="pair-form" class="form-grid">
+                <label for="pair-session">Session</label
+                ><select
+                  id="pair-session"
+                  class="session-picker"
+                  required
+                ></select
+                ><label for="pair-phone">Phone number with country code</label
+                ><input
+                  id="pair-phone"
+                  inputmode="numeric"
+                  pattern="[0-9]{7,15}"
+                  required
+                  placeholder="5511999999999"
+                /><button type="submit" class="secondary">
+                  Request pairing code</button
+                ><output
+                  id="pair-code"
+                  class="code-output"
+                  aria-live="polite"
+                ></output>
+              </form>
+            </article>
+          </div>
+        </section>
+        <section id="events" class="page" hidden>
+          <div class="intro">
+            <div>
+              <h2>Every retained event, in order.</h2>
+              <p class="muted">
+                Replay uses the original event ID. Consumers should deduplicate
+                deliveries.
+              </p>
+            </div>
+          </div>
+          <article class="panel">
+            <form id="events-form" class="inline-form">
+              <label for="event-session">Session</label
+              ><select
+                id="event-session"
+                class="session-picker"
+                required
+              ></select
+              ><button type="submit" class="primary">Load events</button>
+            </form>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Created</th>
+                    <th>Event</th>
+                    <th>Event ID</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody id="event-rows"></tbody>
+              </table>
+            </div>
+            <div id="event-empty" class="empty">
+              <h3>No events loaded.</h3>
+              <p>Choose a session to inspect its retained events.</p>
+            </div>
+            <button id="more-events" class="secondary" hidden>Load more</button>
+            <details>
+              <summary>Selected event</summary>
+              <pre id="event-detail">Select an event to view its data.</pre>
+            </details>
+          </article>
+        </section>
+        <section id="history" class="page" hidden>
+          <div class="intro">
+            <div>
+              <h2>The messages you've observed.</h2>
+              <p class="muted">
+                Includes available synchronized history within retention limits.
+                This is a partial view of the inbox.
+              </p>
+            </div>
+          </div>
+          <article class="panel">
+            <form id="history-form" class="inline-form">
+              <label for="history-session">Session</label
+              ><select
+                id="history-session"
+                class="session-picker"
+                required
+              ></select
+              ><label for="history-chat"
+                >Chat ID <span class="hint">optional</span></label
+              ><input
+                id="history-chat"
+                placeholder="5511999999999@s.whatsapp.net"
+              /><button class="primary" type="submit">Load messages</button>
+            </form>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Time</th>
+                    <th>Chat / ID</th>
+                    <th>Type</th>
+                    <th>Message</th>
+                  </tr>
+                </thead>
+                <tbody id="message-rows"></tbody>
+              </table>
+            </div>
+            <div id="history-empty" class="empty">
+              <h3>No messages loaded.</h3>
+              <p>Choose a session to inspect its observed history.</p>
+            </div>
+            <button id="older-messages" class="secondary" hidden>
+              Older messages
+            </button>
+          </article>
+          <article class="panel">
+            <h2>Send a text message</h2>
+            <form id="send-form" class="form-grid">
+              <div class="two-col compact">
+                <div>
+                  <label for="send-session">Session</label
+                  ><select
+                    id="send-session"
+                    class="session-picker"
+                    required
+                  ></select>
+                </div>
+                <div>
+                  <label for="send-phone">Recipient</label
+                  ><input
+                    id="send-phone"
+                    required
+                    placeholder="5511999999999"
+                  />
+                </div>
+              </div>
+              <label class="check"
+                ><input id="send-group" type="checkbox" /> Group
+                recipient</label
+              ><label for="send-message">Message</label
+              ><textarea
+                id="send-message"
+                required
+                rows="4"
+                maxlength="65536"
+                placeholder="Write a message..."
+              ></textarea
+              ><label for="send-quote"
+                >Quoted message ID
+                <span class="hint">optional, from the same chat</span></label
+              ><input id="send-quote" /><button class="primary" type="submit">
+                Send message
+              </button>
+            </form>
+          </article>
+        </section>
+        <section id="settings" class="page" hidden>
+          <div class="intro">
+            <div>
+              <h2>Configure with intent.</h2>
+              <p class="muted">
+                Automation is off by default. Proxy changes apply after
+                restarting the session.
+              </p>
+            </div>
+          </div>
+          <div class="two-col">
+            <article class="panel">
+              <h2>Session settings</h2>
+              <form id="settings-form" class="form-grid">
+                <label for="settings-session">Session</label
+                ><select
+                  id="settings-session"
+                  class="session-picker"
+                  required
+                ></select
+                ><label class="check"
+                  ><input id="auto-read" type="checkbox" /> Automatically mark
+                  received messages as read</label
+                ><label class="check"
+                  ><input id="always-online" type="checkbox" /> Publish online
+                  presence on connection</label
+                ><label for="proxy-url"
+                  >Replace proxy URL <span class="hint">optional</span></label
+                ><input
+                  id="proxy-url"
+                  type="password"
+                  autocomplete="off"
+                  placeholder="Leave blank to preserve the current proxy"
+                /><label class="check"
+                  ><input id="clear-proxy" type="checkbox" /> Remove the
+                  configured proxy</label
+                >
+                <p id="proxy-state" class="hint"></p>
+                <button class="primary" type="submit">Save settings</button>
+              </form>
+            </article>
+            <article class="panel">
+              <span class="eyebrow">SERVER CAPABILITIES</span>
+              <h2>Available modules</h2>
+              <div id="capability-list" class="capability-list"></div>
+              <p class="hint">
+                Optional transports and storage depend on the server
+                configuration. Experimental interactive delivery depends on
+                WhatsApp client support.
+              </p>
+              <a href="/openapi.json" target="_blank" rel="noopener noreferrer"
+                >View the API contract ↗</a
+              >
+            </article>
+          </div>
+        </section>
+        <footer class="workspace-foot">
+          WPPConnect Server Go <span>Direct protocol. Explicit contracts.</span>
+        </footer>
+      </main>
+    </div>
+    <dialog id="qr-dialog">
+      <div class="panel-heading">
+        <h2>Link this session</h2>
+        <button id="close-qr" class="quiet" autofocus>Close</button>
+      </div>
+      <p>Scan this QR code from WhatsApp's linked devices.</p>
+      <img
+        id="qr-image"
+        width="256"
+        height="256"
+        alt="WhatsApp pairing QR code"
+      />
+      <p class="hint">
+        Pairing codes are temporary. Request a new code if it expires.
+      </p>
+    </dialog>
+  </body>
+</html>

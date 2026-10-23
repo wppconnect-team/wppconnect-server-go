@@ -316,8 +316,8 @@ func TestDirectoryUnsupportedAndValidation(t *testing.T) {
 		body  any
 		code  int
 	}{
-		{"list-chats", map[string]any{"withLabels": []string{"Customer"}}, 501},
-		{"list-chats", map[string]any{"onlyCommunities": true}, 501},
+		{"list-chats", map[string]any{"withLabels": []string{"Customer"}}, 400},
+		{"list-chats", map[string]any{"onlyCommunities": true}, 404},
 		{"list-chats", map[string]any{"count": 1001}, 400},
 		{"list-chats", map[string]any{"count": 0}, 400},
 		{"list-chats", map[string]any{"direction": "invalid"}, 400},

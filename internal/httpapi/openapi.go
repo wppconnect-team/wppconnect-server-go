@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"regexp"
+	"strconv"
 	"strings"
 	"sync"
 
@@ -115,7 +116,8 @@ func contractFor(name string) routeContract {
 	case "send-message":
 		c.tag = "messages"
 		c.success = 201
-		c.body = object(schema{"phone": stringList(100), "message": str(), "isGroup": boolean()}, "phone", "message")
+		c.body = textSchema()
+		c.response = ref("AdvancedSent")
 	case "send-seen":
 		c.tag = "messages"
 		c.body = object(schema{"phone": str()}, "phone")
@@ -198,7 +200,7 @@ func contractFor(name string) routeContract {
 		c.response = array(ref("Chat"))
 		c.body = ref("ChatFilter")
 		c.optionalBody = true
-		c.description = "after includes anchor; before excludes it. No anchor + before returns []. Labels/communities filters return 501."
+		c.description = "after includes anchor; before excludes it. No anchor + before returns []. withLabels matches all requested numeric label IDs (up to 20) from observed labels. onlyCommunities uses joined group parent metadata."
 	case "chat-by-id":
 		c.tag = "chats"
 		c.response = ref("Chat")
@@ -215,9 +217,7 @@ func contractFor(name string) routeContract {
 			c.body = object(schema{"isOnline": schema{"type": "boolean", "default": true}})
 		}
 	case "all-chats-with-messages", "all-messages-in-chat", "all-new-messages", "unread-messages", "all-unread-messages", "message-by-id", "load-messages-in-chat", "get-messages":
-		c.tag = "unsupported"
-		c.unsupported = true
-		c.description = "Always 501 after authentication and session connection checks. Browser message database is not implemented."
+		c = historyContract()
 	case "all-groups":
 		c.tag = "groups"
 		c.response = envelope(array(ref("GroupSummary")))
@@ -268,7 +268,11 @@ func contractFor(name string) routeContract {
 		c.multipart = true
 		c.response = envelope(schema{})
 	default:
-		panic("missing OpenAPI contract for " + name)
+		var ok bool
+		c, ok = extendedContract(name)
+		if !ok {
+			panic("missing OpenAPI contract for " + name)
+		}
 	}
 	if name == "contact-vcard" || name == "send-contact" || name == "send-location" || name == "send-poll-message" {
 		props := c.body["properties"].(schema)
@@ -285,26 +289,36 @@ func buildOpenAPI() []byte {
 	pattern := regexp.MustCompile(`\{([^}]+)\}`)
 	router := (&Server{}).router().(chi.Routes)
 	err := chi.Walk(router, func(method, path string, _ http.Handler, _ ...func(http.Handler) http.Handler) error {
+		if strings.HasPrefix(path, "/manager") {
+			return nil
+		} // Static console assets are outside the API contract.
 		name := strings.TrimPrefix(path, "/api/{session}/")
 		if strings.HasSuffix(path, "/generate-token") {
 			name = "generate-token"
 		} else if strings.HasPrefix(path, "/api/dashboard/") {
 			name = "dashboard/stats"
+		} else if strings.HasPrefix(path, "/api/admin/") {
+			name = "admin/" + strings.Split(strings.TrimPrefix(path, "/api/admin/"), "/")[0]
+		} else if strings.HasPrefix(name, "events/") {
+			name = "events/" + strings.Split(strings.TrimPrefix(name, "events/"), "/")[0]
 		} else if strings.HasPrefix(name, "contact/pn-lid/") {
 			name = "contact/pn-lid"
 		} else {
 			name = strings.Split(strings.TrimPrefix(name, "/"), "/")[0]
 		}
 		c := contractFor(name)
+		if name == "admin/sessions" && method == http.MethodPost {
+			c.success = 201
+		}
+		if method == http.MethodGet {
+			c.body = nil
+		}
 		responses := schema{}
 		for _, code := range []string{"400", "401", "403", "404", "408", "409", "410", "413", "415", "422", "429", "500", "501", "502", "503", "504"} {
 			responses[code] = contentResponse("Operation error; inspect status/message and any completed work.", ref("Error"))
 		}
 		if !c.unsupported {
-			code := "200"
-			if c.success == 201 {
-				code = "201"
-			}
+			code := strconv.Itoa(c.success)
 			if c.response == nil {
 				responses[code] = schema{"description": "Healthy"}
 			} else {
@@ -316,8 +330,14 @@ func buildOpenAPI() []byte {
 			if name == "qrcode-session" {
 				responses["200"].(schema)["content"].(schema)["image/png"] = schema{"schema": schema{"type": "string", "format": "binary"}}
 			}
+			if name == "metrics" {
+				responses["200"] = schema{"description": "Prometheus metrics for authenticated administrators", "content": schema{"text/plain": schema{"schema": str()}}}
+			}
 		}
 		operation := schema{"operationId": strings.ToLower(method) + "_" + strings.NewReplacer("/", "_", "-", "_", ".", "_").Replace(name), "summary": name, "description": c.description, "tags": []string{c.tag}, "responses": responses, "x-implemented": !c.unsupported}
+		if name == "messages" && strings.Contains(path, "{messageId}") {
+			operation["operationId"] = operation["operationId"].(string) + "_by_id"
+		}
 		params := make([]schema, 0)
 		for _, match := range pattern.FindAllStringSubmatch(path, -1) {
 			param := str()
@@ -331,16 +351,36 @@ func buildOpenAPI() []byte {
 				params = append(params, schema{"name": key, "in": "query", "schema": boolean(), "description": "Unsupported or conflicting chat type flags are rejected."})
 			}
 		}
+		if c.tag == "history" || name == "events" || name == "events/ws" || name == "stored-media" {
+			for _, key := range []string{"chatId", "cursor", "limit"} {
+				params = append(params, schema{"name": key, "in": "query", "schema": str()})
+			}
+		}
+		if strings.HasPrefix(name, "admin/") && method != http.MethodGet {
+			params = append(params, schema{"name": "X-CSRF-Token", "in": "header", "schema": str(), "description": "Required for cookie-authenticated writes. Returned by login/auth; Bearer-authenticated calls do not require CSRF."})
+		}
 		if len(params) > 0 {
 			operation["parameters"] = params
 		}
 		if !strings.Contains(path, "{session}") || name == "generate-token" {
 			operation["security"] = []any{}
 		}
+		if (strings.HasPrefix(name, "admin/") && name != "admin/login") || name == "metrics" || name == "dashboard/stats" {
+			operation["security"] = []schema{{"adminBearer": []string{}}, {"adminCookie": []string{}}}
+		}
+		if strings.Contains(path, "{session}") {
+			operation["security"] = []schema{{"bearerAuth": []string{}}, {"adminBearer": []string{}}, {"adminCookie": []string{}}}
+			if name == "generate-token" {
+				operation["security"] = []any{}
+			}
+		}
 		if c.body != nil {
 			content := schema{"application/json": schema{"schema": c.body}}
 			if c.multipart {
 				required := []string{"phone", "file"}
+				if name == "set-profile-picture" || name == "send-status-media" {
+					required = []string{"file"}
+				}
 				if name == "group-pic" {
 					required = []string{"groupId", "file"}
 				}
@@ -358,6 +398,8 @@ func buildOpenAPI() []byte {
 		panic(err)
 	}
 	doc := schema{"openapi": "3.0.3", "info": schema{"title": "WPPConnect Server Go", "version": "checkout", "description": "Implemented HTTP contract and explicit unsupported operations. Does not claim full Node parity. Use Bearer authentication per session; SECRET_KEY is only for token bootstrap. See docs for data/privacy limits."}, "servers": []schema{{"url": "/"}}, "security": []schema{{"bearerAuth": []string{}}}, "paths": paths, "components": schema{"securitySchemes": schema{"bearerAuth": schema{"type": "http", "scheme": "bearer", "bearerFormat": "session-bound bcrypt token"}}, "schemas": contractSchemas()}}
+	doc["components"].(schema)["securitySchemes"].(schema)["adminBearer"] = schema{"type": "http", "scheme": "bearer", "bearerFormat": "ADMIN_TOKEN"}
+	doc["components"].(schema)["securitySchemes"].(schema)["adminCookie"] = schema{"type": "apiKey", "in": "cookie", "name": "wppgo_admin", "description": "8-hour HttpOnly, SameSite=Strict administrator session; writes require the CSRF header."}
 	b, err := json.MarshalIndent(doc, "", "  ")
 	if err != nil {
 		panic(err)

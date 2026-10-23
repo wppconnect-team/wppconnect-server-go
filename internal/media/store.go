@@ -99,6 +99,8 @@ func Unwrap(msg *waE2E.Message) *waE2E.Message {
 			inner = msg.GetViewOnceMessageV2Extension().GetMessage()
 		case msg.GetPollCreationMessageV4().GetMessage() != nil:
 			inner = msg.GetPollCreationMessageV4().GetMessage()
+		case msg.GetEditedMessage().GetMessage() != nil:
+			inner = msg.GetEditedMessage().GetMessage()
 		default:
 			return msg
 		}
@@ -174,3 +176,6 @@ func attachment(msg *waE2E.Message) (Attachment, bool) {
 	}
 	return Attachment{Message: downloadable, Mimetype: source.GetMimetype(), Filename: Filename(filename), Length: u.FileLength}, true
 }
+
+// Descriptor rebuilds a bounded download descriptor from trusted session history.
+func Descriptor(msg *waE2E.Message) (Attachment, bool) { return attachment(msg) }

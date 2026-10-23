@@ -6,3 +6,4 @@ userDataDir/
 .DS_Store
 .env
 graphify-out/
+.tmp/

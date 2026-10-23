@@ -1,5 +1,11 @@
 # Evolution Go capability benchmark
 
+> Source expansion update: the historical baseline below is superseded for
+> message history, labels/community filters, durable events and administration
+> by the [current English guide](roadmap-completion.md). New capabilities require
+> a build containing this change. Experimental/unsupported features remain explicit.
+
+
 Reviewed on October 23, 2026. This is a source comparison and a planning input,
 not a claim that WPPConnect Server Go implements the reference API or has reached
 feature parity. No live WhatsApp account was used for this review.

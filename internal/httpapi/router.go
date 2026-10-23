@@ -10,17 +10,22 @@ import (
 	"errors"
 	"net/http"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/skip2/go-qrcode"
+	"github.com/wppconnect-team/wppconnect-server-go/internal/account"
 	"github.com/wppconnect-team/wppconnect-server-go/internal/auth"
+	"github.com/wppconnect-team/wppconnect-server-go/internal/channels"
 	"github.com/wppconnect-team/wppconnect-server-go/internal/config"
 	"github.com/wppconnect-team/wppconnect-server-go/internal/directory"
+	"github.com/wppconnect-team/wppconnect-server-go/internal/eventbus"
 	"github.com/wppconnect-team/wppconnect-server-go/internal/groups"
+	"github.com/wppconnect-team/wppconnect-server-go/internal/history"
 	"github.com/wppconnect-team/wppconnect-server-go/internal/media"
 	"github.com/wppconnect-team/wppconnect-server-go/internal/session"
-	"go.mau.fi/whatsmeow/proto/waE2E"
+	"github.com/wppconnect-team/wppconnect-server-go/internal/vault"
 	"go.mau.fi/whatsmeow/types"
 )
 
@@ -32,11 +37,55 @@ type Server struct {
 	mediaSlots       chan struct{}
 	groupSession     func(string) (groups.Client, bool)
 	directorySession func(string) (directory.Client, *directory.State, bool)
+	historySession   func(string) (*history.Store, func(), error)
+	accountSession   func(string) (account.Client, bool)
+	channelSession   func(string) (channels.Client, bool)
+	events           *eventbus.Bus
+	mediaVault       *vault.Vault
+	adminMu          sync.Mutex
+	adminSessions    map[[32]byte]adminSession
+	loginAttempts    map[string]loginAttempts
+	streams          chan struct{}
 }
 
 // NewRouter builds the chi router with the compatible endpoints.
 func NewRouter(cfg config.Config, mgr *session.Manager) http.Handler {
+	return NewRouterWithEvents(cfg, mgr, nil)
+}
+func NewRouterWithEvents(cfg config.Config, mgr *session.Manager, bus *eventbus.Bus) http.Handler {
+	return NewRouterWithServices(cfg, mgr, Services{Events: bus})
+}
+
+type Services struct {
+	Events *eventbus.Bus
+	Media  *vault.Vault
+}
+
+func NewRouterWithServices(cfg config.Config, mgr *session.Manager, services Services) http.Handler {
 	s := &Server{cfg: cfg, mgr: mgr}
+	s.channelSession = func(name string) (channels.Client, bool) {
+		h, ok := mgr.Get(name)
+		if !ok || h.GetStatus() != session.StatusConnected {
+			return nil, false
+		}
+		return channels.SDK{Client: h.Client}, true
+	}
+	s.events, s.mediaVault = services.Events, services.Media
+	s.accountSession = func(name string) (account.Client, bool) {
+		h, ok := mgr.Get(name)
+		if !ok || h.GetStatus() != session.StatusConnected {
+			return nil, false
+		}
+		return account.SDK{Client: h.Client}, true
+	}
+	s.historySession = func(name string) (*history.Store, func(), error) {
+		store, err := mgr.OpenHistory(name)
+		return store, func() {
+			if store != nil {
+				store.Close()
+			}
+		}, err
+	}
 	s.mediaSession = func(name string) (media.Client, *media.Store, bool) {
 		h, ok := mgr.Get(name)
 		if !ok || h.GetStatus() != session.StatusConnected {
@@ -63,6 +112,9 @@ func NewRouter(cfg config.Config, mgr *session.Manager) http.Handler {
 
 func (s *Server) router() http.Handler {
 	s.mediaSlots = make(chan struct{}, 4)
+	s.streams = make(chan struct{}, 32)
+	s.adminSessions = make(map[[32]byte]adminSession)
+	s.loginAttempts = make(map[string]loginAttempts)
 	r := chi.NewRouter()
 	r.Get("/openapi.json", s.openAPI)
 
@@ -80,18 +132,21 @@ func (s *Server) router() http.Handler {
 		}
 		w.WriteHeader(http.StatusOK)
 	})
-	r.Get("/api/dashboard/stats", s.dashboardStats)
+	r.Get("/api/dashboard/stats", s.adminOnly(s.dashboardStats))
+	s.adminRoutes(r)
+	s.managerRoutes(r)
 	r.Post("/api/{session}/{secretkey}/generate-token", s.generateToken)
 
 	r.Group(func(protected chi.Router) {
 		protected.Use(s.auth)
 		// Mirrors POST /api/:session/start-session
 		protected.Post("/api/{session}/start-session", s.startSession)
+		protected.Post("/api/{session}/pair-phone", s.pairPhone)
 		// Mirrors GET /api/:session/status-session
 		protected.Get("/api/{session}/status-session", s.statusSession)
 		protected.Get("/api/{session}/qrcode-session", s.qrcodeSession)
 		// Mirrors POST /api/:session/send-message
-		protected.Post("/api/{session}/send-message", s.sendMessage)
+		protected.Post("/api/{session}/send-message", s.sendText)
 		// Mirrors POST /api/:session/close-session and logout-session
 		protected.Post("/api/{session}/close-session", s.closeSession)
 		protected.Post("/api/{session}/logout-session", s.logoutSession)
@@ -105,6 +160,14 @@ func (s *Server) router() http.Handler {
 		protected.Post("/api/{session}/download-media", s.downloadMedia)
 		protected.Get("/api/{session}/get-media-by-message/{messageId}", s.downloadMedia)
 		s.advancedRoutes(protected)
+		s.historyRoutes(protected)
+		s.actionRoutes(protected)
+		s.accountRoutes(protected)
+		s.mutationRoutes(protected)
+		s.eventRoutes(protected)
+		s.vaultRoutes(protected)
+		s.channelRoutes(protected)
+		s.statusRoutes(protected)
 		// Mirrors POST /api/:session/send-seen
 		protected.Post("/api/{session}/send-seen", s.sendSeen)
 		// Mirrors GET /api/:session/check-number-status/:phone
@@ -120,6 +183,14 @@ func (s *Server) auth(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		sessionParam := chi.URLParam(r, "session")
 		sessionName := cleanSession(sessionParam)
+		if !session.ValidName(sessionName) {
+			writeJSON(w, 400, map[string]any{"status": "error", "message": "invalid session name"})
+			return
+		}
+		if s.adminCredentials(r, r.Method != "GET" && r.Method != "HEAD") {
+			next.ServeHTTP(w, r)
+			return
+		}
 		token := ""
 		if parts := strings.SplitN(sessionParam, ":", 2); len(parts) == 2 {
 			token = parts[1]
@@ -239,47 +310,6 @@ func (s *Server) qrcodeSession(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "image/png")
 	w.WriteHeader(http.StatusOK)
 	_, _ = w.Write(png)
-}
-
-type sendMessageReq struct {
-	Phone   any    `json:"phone"` // string or []string, like the Node server
-	Message string `json:"message"`
-	IsGroup bool   `json:"isGroup"`
-}
-
-func (s *Server) sendMessage(w http.ResponseWriter, r *http.Request) {
-	name := cleanSession(chi.URLParam(r, "session"))
-	h, ok := s.mgr.Get(name)
-	if !ok || h.GetStatus() != session.StatusConnected {
-		writeJSON(w, http.StatusNotFound, map[string]any{
-			"status": "disconnected", "session": name,
-		})
-		return
-	}
-
-	var req sendMessageReq
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		writeJSON(w, http.StatusBadRequest, map[string]any{"status": "error"})
-		return
-	}
-
-	for _, phone := range toList(req.Phone) {
-		jid := types.NewJID(phone, types.DefaultUserServer)
-		if req.IsGroup {
-			jid = types.NewJID(phone, types.GroupServer)
-		}
-		resp, err := h.Client.SendMessage(r.Context(), jid, &waE2E.Message{
-			Conversation: &req.Message,
-		})
-		if err != nil {
-			writeJSON(w, http.StatusInternalServerError, map[string]any{
-				"status": "error", "message": err.Error(),
-			})
-			return
-		}
-		s.observeSent(name, jid, resp.ID, resp.Timestamp)
-	}
-	writeJSON(w, http.StatusCreated, map[string]any{"status": "success"})
 }
 
 func (s *Server) closeSession(w http.ResponseWriter, r *http.Request) {
@@ -418,22 +448,6 @@ func (s *Server) notSupported(capability string) http.HandlerFunc {
 			"message":    "Capability is not supported by wppconnect-server-go yet.",
 		})
 	}
-}
-
-func toList(v any) []string {
-	switch t := v.(type) {
-	case string:
-		return []string{t}
-	case []any:
-		out := make([]string, 0, len(t))
-		for _, e := range t {
-			if s, ok := e.(string); ok {
-				out = append(out, s)
-			}
-		}
-		return out
-	}
-	return nil
 }
 
 func writeJSON(w http.ResponseWriter, status int, body any) {

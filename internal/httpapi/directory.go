@@ -17,6 +17,7 @@ import (
 	"github.com/wppconnect-team/wppconnect-server-go/internal/directory"
 	"github.com/wppconnect-team/wppconnect-server-go/internal/groups"
 	"go.mau.fi/whatsmeow"
+	"go.mau.fi/whatsmeow/proto/waE2E"
 	"go.mau.fi/whatsmeow/types"
 	"go.mau.fi/whatsmeow/types/events"
 )
@@ -37,7 +38,7 @@ func (s *Server) directoryRoutes(r chi.Router) {
 		r.Post("/api/{session}/"+mode, s.setPresence(mode))
 	}
 	for _, route := range []string{"all-chats-with-messages", "all-messages-in-chat/{phone}", "all-new-messages", "unread-messages", "all-unread-messages", "message-by-id/{messageId}", "load-messages-in-chat/{phone}", "get-messages/{phone}"} {
-		r.Get("/api/{session}/"+route, s.unsupportedDirectory("message_history", "This server indexes chat metadata, not the browser message database."))
+		r.Get("/api/{session}/"+route, s.messageHistory)
 	}
 }
 
@@ -53,7 +54,24 @@ func (s *Server) directoryConnection(w http.ResponseWriter, r *http.Request) (di
 	return nil, nil, false
 }
 
-func (s *Server) observeSent(name string, jid types.JID, id string, t time.Time) {
+func (s *Server) observeSent(name string, jid types.JID, id string, t time.Time, messages ...*waE2E.Message) {
+	if t.IsZero() {
+		t = time.Now()
+	}
+	if s.mgr != nil && len(messages) > 0 {
+		if h, ok := s.mgr.Get(name); ok && h.History != nil {
+			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+			var self types.JID
+			if h.Client.Store != nil && h.Client.Store.ID != nil {
+				self = h.Client.Store.ID.ToNonAD()
+			}
+			err := h.History.Put(ctx, types.MessageInfo{ID: id, Timestamp: t, MessageSource: types.MessageSource{Chat: jid, Sender: self, IsFromMe: true}}, messages[0])
+			cancel()
+			if err != nil {
+				log.Printf("outgoing message persistence failed: %v", err)
+			}
+		}
+	}
 	if s.directorySession == nil {
 		return
 	}
@@ -305,9 +323,15 @@ func (s *Server) chats(mode string) http.HandlerFunc {
 				groupInputError(w, err)
 				return
 			}
-			if len(filter.WithLabels) > 0 || filter.OnlyCommunities {
-				writeJSON(w, 501, map[string]any{"status": "not_supported", "capability": "chat_labels_communities", "message": "Labels and community classification are not indexed."})
+			if len(filter.WithLabels) > 20 {
+				groupInputError(w, errors.New("at most 20 labels may be filtered"))
 				return
+			}
+			for _, label := range filter.WithLabels {
+				if n, err := strconv.ParseUint(label, 10, 16); err != nil || n == 0 {
+					groupInputError(w, errors.New("label IDs must be 1..65535"))
+					return
+				}
 			}
 			if filter.OnlyGroups && filter.OnlyUsers {
 				groupInputError(w, errors.New("onlyGroups and onlyUsers conflict"))
@@ -340,6 +364,36 @@ func (s *Server) chats(mode string) http.HandlerFunc {
 		}
 		ctx, cancel := groupContext(r)
 		defer cancel()
+		var labels map[string]map[string]bool
+		if len(filter.WithLabels) > 0 {
+			store, close, ok := s.archive(w, r)
+			if !ok {
+				return
+			}
+			defer close()
+			labels, err = store.ChatLabelSets(ctx)
+			if err != nil {
+				historyError(w, err)
+				return
+			}
+		}
+		communities := map[string]bool{}
+		if filter.OnlyCommunities {
+			gc, ok := s.groupConnection(w, r)
+			if !ok {
+				return
+			}
+			joined, e := gc.GetJoinedGroups(ctx)
+			if e != nil {
+				directoryError(w, e)
+				return
+			}
+			for _, group := range joined {
+				if group.IsParent {
+					communities[group.JID.String()] = true
+				}
+			}
+		}
 		list, err := state.Chats.List(ctx)
 		if err != nil {
 			directoryError(w, err)
@@ -352,6 +406,19 @@ func (s *Server) chats(mode string) http.HandlerFunc {
 		}
 		result := make([]directory.Chat, 0, len(list))
 		for _, c := range list {
+			if filter.OnlyCommunities && !communities[c.JID] {
+				continue
+			}
+			matches := true
+			for _, label := range filter.WithLabels {
+				if !labels[c.JID][label] {
+					matches = false
+					break
+				}
+			}
+			if !matches {
+				continue
+			}
 			jid, _ := types.ParseJID(c.JID)
 			if info, ok := contacts[jid]; ok && jid.Server != types.GroupServer {
 				c.Name = directory.ContactData(jid, info)["name"].(string)

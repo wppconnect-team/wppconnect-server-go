@@ -292,7 +292,7 @@ func (s *Server) sendMedia(w http.ResponseWriter, r *http.Request, kind media.Ki
 			return
 		}
 		store.Remember(resp.ID, msg)
-		s.observeSent(cleanSession(chi.URLParam(r, "session")), jid, resp.ID, resp.Timestamp)
+		s.observeSent(cleanSession(chi.URLParam(r, "session")), jid, resp.ID, resp.Timestamp, msg)
 		results = append(results, map[string]any{"id": resp.ID, "to": jid.String(), "mimetype": mimetype, "filename": filename})
 	}
 	writeJSON(w, http.StatusCreated, map[string]any{"status": "success", "response": results, "mapper": "return"})
@@ -339,6 +339,18 @@ func (s *Server) downloadMedia(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	a, ok := store.Get(id)
+	if !ok && s.historySession != nil {
+		archive, close, err := s.historySession(cleanSession(chi.URLParam(r, "session")))
+		if err == nil {
+			ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
+			record, e := archive.Find(ctx, id)
+			if e == nil && !record.Deleted {
+				a, ok = media.Descriptor(record.Message)
+			}
+			cancel()
+			close()
+		}
+	}
 	if !ok {
 		writeJSON(w, http.StatusNotFound, map[string]any{"status": "error", "message": "media message not found in this session or expired"})
 		return

@@ -72,8 +72,8 @@ sem equivalência com o banco completo de mensagens do navegador.
 Critério de conclusão atendido por testes HTTP, SQLite real com reabertura,
 eventos fora de ordem, concorrência, expiração, timers, isolamento e entrega de
 webhooks simulados. Veja [contratos e exemplos](contacts-chats-presence.pt-BR.md).
-Filtros por etiquetas/comunidades e oito consultas históricas sem suporte
-retornam `501`. A imagem `0.1.3` inclui a etapa; validação com conta real é separada.
+Na expansão, filtros por etiquetas/comunidades e oito consultas históricas
+foram implementados sobre os dados observados. A imagem `0.1.3` inclui a etapa; validação com conta real é separada.
 
 ## 4. Operação e ciclo de sessão: implementada no código-fonte
 
@@ -121,21 +121,21 @@ servidor Node ou com Evolution Go.
 O [benchmark em inglês](evolution-go-benchmark.md) fixa Evolution Go `0.7.2`
 no commit `9337afc47e10b86cc896a6f432240e40fee95dd1`, compara o código efetivo e
 registra diferenças entre rotas anunciadas, implementações e itens com TODO.
-As próximas etapas são futuras entregas; o README não as anuncia como prontas.
+A expansão foi implementada no código-fonte; consulte os limites no guia atual.
 
-## 6. Expansão de capacidades: próximas etapas
+## 6. Expansão de capacidades: concluída no código-fonte
 
 - [x] Mensagens nativas adicionais: vídeo, stickers, contatos, localização e criação de enquetes (código-fonte).
-- [ ] Ações/contexto: reação, quote/menções, edição/revogação e recibos com IDs explícitos.
-- [ ] Persistência de mensagens/histórico com paginação, retenção e isolamento por sessão.
-- [ ] Perfil, privacidade e bloqueios, com permissões e efeitos documentados.
-- [ ] Mutações verificadas de chats e persistência/eventos de etiquetas.
-- [ ] Outbox durável, replay e adaptadores opcionais para WebSocket, RabbitMQ e NATS.
-- [ ] Armazenamento de mídia opcional em S3/MinIO com acesso privado e retenção.
-- [ ] Pareamento por telefone, administração autenticada e configurações por sessão.
-- [ ] Avaliar comunidades/newsletters, status, interativos, chamadas e votos de enquetes.
-- [ ] Painel de gestão opcional, métricas e documentação complementar em inglês.
-- [ ] Definir e publicar um arquivo `LICENSE` próprio do projeto, sem presumir a licença da referência.
+- [x] Ações/contexto: reação, quote/menções, edição/revogação e recibos com IDs explícitos.
+- [x] Persistência de mensagens/histórico com paginação, retenção e isolamento por sessão.
+- [x] Perfil, privacidade e bloqueios, com permissões e efeitos documentados.
+- [x] Mutações verificadas de chats e persistência/eventos de etiquetas.
+- [x] Outbox durável, replay e adaptadores opcionais para WebSocket, RabbitMQ e NATS.
+- [x] Armazenamento de mídia opcional em S3/MinIO com acesso privado e retenção.
+- [x] Pareamento por telefone, administração autenticada e configurações por sessão.
+- [x] Avaliar comunidades/newsletters, status, interativos, chamadas e votos de enquetes.
+- [x] Painel de gestão opcional, métricas e documentação complementar em inglês.
+- [x] Definir e publicar um arquivo `LICENSE` próprio do projeto, sem presumir a licença da referência.
 
 A etapa de mensagens nativas adiciona oito rotas autenticadas: vídeo MP4/H.264
 com legenda, stickers WebP estáticos/animados, vCards individuais/múltiplos,
@@ -162,3 +162,26 @@ de rotas ou pela simples presença de um método no SDK.
 Histórias/status, catálogo, templates interativos e edição de perfil comercial
 precisam de uma avaliação específica de suporte no whatsmeow antes de qualquer
 promessa de paridade.
+
+## Evidências de conclusão da expansão
+
+O [guia completo em inglês](roadmap-completion.md) documenta todas as rotas,
+configurações, efeitos, migração e limites desta entrega. O código inclui ações
+de mensagens, histórico SQLite, perfil/privacidade/bloqueios, mutações de chats,
+etiquetas, outbox/replay, WebSocket/RabbitMQ/NATS, mídia privada S3, pareamento
+por telefone, administração, painel e métricas. Apache-2.0 está publicada em
+LICENSE e os avisos de dependências acompanham a imagem.
+
+A avaliação do SDK foi concluída: comunidades, newsletters, status, rejeição
+de chamadas e votos/resultados parciais têm integração. Botões/listas ficam
+experimentais e desabilitados por padrão. Carrosséis retornam 501; chamadas de
+áudio/vídeo, catálogo e templates comerciais não foram implementados. Concluir
+a avaliação não significa suporte universal nem paridade integral com Evolution Go.
+
+Testes cobrem contratos, autorização, isolamento, SQLite real, recuperação de
+leases/replay, falhas de protocolo e UI administrativa. O CI usa containers reais
+de NATS/RabbitMQ/MinIO para confirmação/reconexão, privacidade e expiração de
+objetos, além de race detector e smoke tests amd64/arm64. Não houve pareamento
+com conta WhatsApp real, conforme orientação do usuário. Estas adições dependem
+de build desta alteração ou release posterior que a inclua; tags anteriores
+não são modificadas retroativamente.

@@ -36,17 +36,12 @@ It is designed for gradual migration of integrations that use those routes.
 Support is defined by the documented contract, rather than full equivalence
 with the Node server or WhatsApp Web's internal database.
 
-**Release baseline:** [v0.1.3](https://github.com/wppconnect-team/wppconnect-server-go/releases/tag/v0.1.3)
-includes the session lifecycle, media, group, contact, chat, presence and
-operational capabilities described here. Its Docker image is available for
-**Linux amd64 and arm64**. The older `0.1.2` image predates these additions.
-The `main` branch may include changes beyond a published release.
-
-**Source checkout additions:** native video, static/animated stickers, contact
-cards, locations and polls are implemented with bounded inputs, normalized
-webhooks and session-isolated media download. They require a build containing
-this stage; the `0.1.3` image does not include them. See the
-[advanced messaging guide](docs/advanced-messages.md) for complete examples.
+**Published baseline:** [v0.1.6](https://github.com/wppconnect-team/wppconnect-server-go/releases/tag/v0.1.6)
+includes advanced native messages and Linux amd64/arm64 images. The expansion
+described below is implemented in source and requires a build containing this
+change or a subsequent release. Earlier image tags do not acquire these features.
+See the [expanded operations guide](docs/roadmap-completion.md) for complete
+deployment, authentication, adapter and API examples.
 
 ## Features
 
@@ -64,10 +59,13 @@ this stage; the `0.1.3` image does not include them. See the
 | Deployment | Docker, Compose, Portainer Standalone/Swarm examples, health/readiness endpoints and multiarch CI. |
 | API contract | OpenAPI 3.0.3, a compatibility matrix and HTTP contract tests. |
 
-The current OpenAPI describes **67 implemented HTTP operations** and **8
-explicitly unsupported history operations**. There is no bundled management UI,
-WebSocket endpoint, message broker or external database requirement for the
-current implementation. Planned capabilities are listed separately below.
+The expanded source also includes message actions and quoted replies, a bounded
+SQLite archive, account/privacy/blocklists, acknowledged chat mutations and
+labels, durable event replay, WebSocket/RabbitMQ/NATS adapters, private S3 media,
+phone pairing, per-session settings, Prometheus metrics and an optional English
+management console at `/manager`. Communities, newsletters, status and poll
+voting use native SDK operations. Buttons/lists are opt-in experimental;
+carousels explicitly return `501`. No live WhatsApp account was used in tests.
 
 ## Quick start
 
@@ -137,7 +135,7 @@ for stack setup, networking, backup and restore instructions.
 
 ### Run from source
 
-Requirements: **Go 1.25 or later**. SQLite is provided by a pure Go driver;
+Requirements: **Go 1.26.10 or later**. SQLite is provided by a pure Go driver;
 normal builds do not require CGO or an external database server.
 
 ```bash
@@ -312,11 +310,20 @@ semantics: `after` includes its anchor, while `before` excludes it.
 | `AUTO_RESTORE_SESSIONS` | `true` | Restore eligible paired sessions at startup. |
 | `SHUTDOWN_TIMEOUT` | `25s` | Total shutdown budget; 1 ms to 5 minutes. |
 | `WEBHOOK_WORKERS` | `2` | Concurrent deliveries; range 1-32. |
-| `WEBHOOK_QUEUE_SIZE` | `256` | Queued events; range 1-10,000. |
+| `WEBHOOK_QUEUE_SIZE` | `256` | Legacy compatibility setting; durable capacity uses `OUTBOX_MAX_*`. |
 | `WEBHOOK_ATTEMPTS` | `4` | Total attempts per event; range 1-10. |
 | `WEBHOOK_TIMEOUT` | `10s` | Timeout per attempt; 1 ms to 1 minute. |
 | `WPP_SERVER_GO_TAG` | example/stack setting | Docker image tag, not a server setting. |
 | `WPP_SERVER_GO_PORT` | `21465` in Portainer stacks | Host port for the Standalone/Swarm templates, not the root Compose file. |
+
+| `ADMIN_TOKEN` | empty | At least 32 bytes; enables separate administrator Bearer/cookie authentication. |
+| `ENABLE_MANAGER` | `true` | Serve the optional English operations console at `/manager`. |
+| `HISTORY_RETENTION_DAYS` / `HISTORY_MAX_MESSAGES` / `HISTORY_MAX_BYTES` | `30` / `100000` / `268435456` | Per-session observed message retention and payload quotas. |
+| `OUTBOX_RETENTION_DAYS` / `OUTBOX_MAX_EVENTS` / `OUTBOX_MAX_BYTES` | `7` / `100000` / `134217728` | Global retained events and payload quotas; pending deliveries are protected from eviction. |
+| `NATS_URL` / `AMQP_URL` | empty | Optional Core NATS and confirmed persistent RabbitMQ delivery. |
+| `S3_ENDPOINT` / `S3_ACCESS_KEY_ID` / `S3_SECRET_ACCESS_KEY` / `S3_BUCKET` | empty | Enable explicit archival in a pre-existing private bucket. |
+| `S3_REGION` / `S3_USE_SSL` / `MEDIA_RETENTION_DAYS` | empty / `true` / `7` | S3 region, TLS and object retention. |
+| `ENABLE_EXPERIMENTAL_INTERACTIVES` | `false` | Opt in to legacy buttons/lists with client/account limitations. |
 
 See [`.env.example`](.env.example) for deployment settings. Set the Docker stop
 grace period above `SHUTDOWN_TIMEOUT`; the supplied stacks allow `35s` for the
@@ -351,12 +358,14 @@ Every payload includes `event` and `session`. For example:
 Deliveries carry `X-WPP-Event-ID` and `X-WPP-Attempt` headers. Retries reuse the
 same ID and body, allowing receivers to deduplicate. HTTP `2xx` confirms a
 successful delivery. Transport errors, `408`, `425`, `429` and `5xx` can retry
-with exponential backoff, jitter and bounded `Retry-After` handling.
+with exponential backoff and bounded `Retry-After` handling.
 
-The queue is bounded and held in memory. It does not guarantee durability or
-ordering, and events can be dropped if it is full or the serialized payload
-exceeds 1 MiB. Shutdown attempts to drain pending events within its deadline.
-See the [operations guide](docs/operation.pt-BR.md) for delivery semantics.
+In expanded source, the SQLite outbox persists events and per-target attempts
+before delivery. Replays preserve IDs, pending deliveries recover after restart,
+and target failures are independent. Payloads above 1 MiB or saturated logs are
+rejected with a metric. Retained-event quotas replace the old in-memory queue.
+Authenticated WebSocket replay, Core NATS flush and RabbitMQ publisher confirms
+have distinct guarantees described in the [expanded guide](docs/roadmap-completion.md).
 
 ## Persistence and lifecycle
 
@@ -366,7 +375,9 @@ Each session owns its credentials and stores under `DATA_DIR`:
 /data/
   mysession.db             WhatsApp device credentials and SDK stores
   mysession.directory.db   Observed chat metadata
-  mysession.session.json   Restore/revocation intent
+  mysession.session.json   Restore/revocation intent and private settings
+  mysession.history.db     Observed messages, receipts, labels and media ownership
+  .events.db               Global durable delivery and retained events
 ```
 
 | Action | Credentials | Next process startup |
@@ -380,10 +391,10 @@ an error and preserves the handle. Empty stores do not start unsolicited QR
 pairing during restoration. Session status can be `INITIALIZING`, `QRCODE`,
 `CONNECTED`, `DISCONNECTED`, `UNPAIRED` or `CLOSED`.
 
-The chat index persists across restart. Media descriptors and recent presence
-remain in memory. There is no full message-body archive. Back up the complete
-volume while the service is stopped, including SQLite sidecar files if present;
-keep backups private because they contain device credentials.
+Chat metadata and observed messages persist across restart. Presence remains
+ephemeral. Retained protocol data enables media downloads and poll decryption;
+it is excluded from HTTP responses. Back up the complete volume while stopped,
+including SQLite sidecars and S3 metadata/objects when enabled. Keep backups private.
 
 `/healthz` checks process liveness. `/readyz` returns `503` during initial
 restoration, then reflects completion of that startup phase. Neither endpoint
@@ -407,23 +418,19 @@ rather than being presented as offline. Contact names and PN/LID mappings depend
 on what the SDK has synchronized. Chat unread counts can be partial and expose
 `unreadCountIsPartial` accordingly.
 
-Eight browser-history operations currently return an authenticated `501` after
-session checks: `all-chats-with-messages`, `all-messages-in-chat`,
-`all-new-messages`, `unread-messages`, `all-unread-messages`, `message-by-id`,
-`load-messages-in-chat` and `get-messages`. Label/community filters also return
-`501` when their unsupported options are requested.
-
-Reactions, edit/delete/quoted-message flows, poll voting/results,
-status publishing, business-profile editing, WebSocket/broker integrations,
-external message persistence and S3/MinIO storage are not part of the current
-HTTP implementation. Their absence here is not a claim that whatsmeow cannot
-support them; each needs implementation and verification against the pinned SDK.
+The eight legacy history operations now query the observed archive with cursor
+envelopes. They do not provide a complete browser inbox. Label/community filters
+are supported using observed labels and joined community metadata. Additional
+limits and endpoint examples are in the [expanded guide](docs/roadmap-completion.md).
+Carousel delivery returns `501`; buttons/lists are experimental and disabled by
+default. Business catalog/templates and call media transport remain outside the
+implemented scope. Universal client/account compatibility is not promised.
 
 ## Security and operations
 
-Use HTTPS and restrict network access to the API. The liveness, readiness,
-OpenAPI and dashboard-stats routes are public; protect the stats route at your
-proxy if session names or operational metadata should be private. Avoid logging
+Use HTTPS and restrict network access to the API. Liveness, readiness and
+OpenAPI are public. Dashboard stats, metrics and administration require the
+separate administrator credential; session tokens cannot access those routes. Avoid logging
 the token bootstrap URL, Bearer headers, QR contents or device credentials.
 
 Session record access validates names at the storage boundary and uses Go's
@@ -451,7 +458,12 @@ internal/
   media/         Bounded uploads, descriptors, downloads and event normalization
   groups/        Group identifiers, contracts and normalized events
   directory/     Contacts, observed chat index and recent presence
-  webhook/       Bounded asynchronous delivery and retries
+  eventbus/      Durable outbox, replay and delivery adapters
+  history/       Bounded message archive, labels and poll results
+  vault/         Private S3-compatible media ownership and retention
+  account/       Own profile and privacy validation
+  channels/      Communities, newsletters, polls and calls SDK seam
+  webhook/       Legacy delivery implementation and compatibility tests
   httpapi/       HTTP handlers, authentication and OpenAPI contract
 scripts/         Independent Node bcrypt fixture generation
 deploy/          Portainer Standalone and Swarm stacks
@@ -461,7 +473,7 @@ docs/            API export, detailed guides, compatibility and roadmap
 
 | Component | Technology |
 | --- | --- |
-| Runtime | Go 1.25+ |
+| Runtime | Go 1.26.10+ |
 | HTTP routing | chi |
 | WhatsApp protocol | Pinned WPPConnect whatsmeow fork |
 | Persistence | SQLite through modernc.org/sqlite, without CGO for normal builds |
@@ -517,7 +529,8 @@ currently available in Portuguese:
 | [Contacts, chats and presence](docs/contacts-chats-presence.pt-BR.md) | PN/LID, metadata pagination, presence and observations. |
 | [Operations](docs/operation.pt-BR.md) | Restoration, disconnect/logout, shutdown, security boundaries and webhook behavior. |
 | [Compatibility matrix](docs/compatibility.pt-BR.md) | Node compatibility and automated evidence per capability. |
-| [Detailed roadmap](docs/roadmap.md) | Completed baseline and future work. |
+| [Detailed roadmap](docs/roadmap.md) | Completed baseline and expansion acceptance evidence. |
+| [Expanded API and operations](docs/roadmap-completion.md) | Complete English examples for the archive, actions, manager, adapters, S3 and evaluated features. |
 | [Evolution Go benchmark](docs/evolution-go-benchmark.md) | Source-backed comparison, gaps and implementation priorities. |
 
 ## Roadmap and Evolution Go benchmark
@@ -528,23 +541,16 @@ integrations, licensing and product UI are separate from this project.
 The [pinned source comparison](docs/evolution-go-benchmark.md) records which
 features have been verified in its source and where our implementation differs.
 
-Completed baseline: session lifecycle and authentication; text/media;
-groups; contacts/chat metadata/presence; bounded webhooks; OpenAPI and multiarch CI.
-The next native-message stage is implemented in source: video/stickers,
-contacts/locations and poll creation, with normalized events and download support.
+All expansion items in the [roadmap](docs/roadmap.md) are addressed in source,
+including the SDK support assessment. The [English guide](docs/roadmap-completion.md)
+documents implemented workflows and explicit limitations. Each capability has
+bounded inputs, session authorization, tests and an OpenAPI contract.
 
-Planned expansion, with exact scope and acceptance tests to be defined per delivery:
-
-1. Message actions/context: reactions, explicit read receipts, quoted messages,
-   mentions and edit/delete flows, where the SDK supports them.
-2. Durable message/history storage with pagination, retention and session isolation.
-3. Durable event delivery and optional WebSocket, RabbitMQ/NATS and storage adapters.
-4. Profile/privacy/blocklist operations and evaluation of status/community/newsletter features.
-5. Optional management UI, operational metrics and broader interoperability tests.
-
-These are **future capabilities**, not functions enabled by changing an environment
-variable today. Progress should be measured by tested workflows and documented
-limits, rather than endpoint counts alone.
+This does not establish full Evolution Go parity: contracts differ, the console
+has a deliberately scoped workflow, buttons/lists remain experimental and
+carousels, business catalogs/templates and call media are unsupported. Live
+WhatsApp validation was omitted at the user's request. The pinned benchmark is
+historical evidence; the completion guide describes the current source.
 
 ## Contributing
 
@@ -563,5 +569,7 @@ This project builds on [whatsmeow](https://github.com/tulir/whatsmeow), the
 their contributors. Evolution Go is referenced as a feature/documentation
 benchmark; this README does not import its code, branding or license terms.
 
-This repository does not currently include a project-wide `LICENSE` file.
-Dependency licenses remain documented by their respective upstream projects.
+Licensed under [Apache-2.0](LICENSE). See [NOTICE](NOTICE) and
+[third-party licenses](third_party/licenses.txt), also shipped in the container.
+Dependency source/version references are retained in `go.mod` and the notices;
+whatsmeow remains under its upstream MPL-2.0 terms.
