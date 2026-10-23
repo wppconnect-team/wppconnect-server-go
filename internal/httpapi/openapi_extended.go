@@ -59,6 +59,11 @@ func textSchema() schema {
 	s["properties"].(schema)["phone"] = stringList(100)
 	return s
 }
+func ownMediaSchema() schema {
+	s := contractSchemas()["MediaRequest"].(schema)
+	delete(s, "required")
+	return s
+}
 func historyContract() routeContract {
 	return routeContract{tag: "history", success: 200, response: schema{"type": "object"}, description: "Session-owned, observed SQLite messages only, including available history sync. Not a full WhatsApp inbox. Default retention 30 days/100000 messages/256 MiB. limit 1..200 (default 50), cursor is a nonnegative ingestion sequence, newest first. isPartial=true. Keys and raw protocol are never exposed. History remains readable while disconnected."}
 }
@@ -69,7 +74,7 @@ func extendedContract(name string) (routeContract, bool) {
 		c.body = object(schema{"message": str()}, "message")
 		c.description = "Publish text status (1..1000 characters) to the account's WhatsApp status privacy audience."
 	case "send-status-media":
-		c.body = ref("MediaRequest")
+		c.body = ownMediaSchema()
 		c.multipart = true
 		c.description = "Publish image or MP4 status using the account's status privacy audience. Same bounded uploads as messaging; phone is unused."
 	case "send-buttons", "send-list":
@@ -101,7 +106,7 @@ func extendedContract(name string) (routeContract, bool) {
 			c.body = requestSchema(accountRequest{})
 		}
 		if name == "set-profile-picture" {
-			c.body = ref("MediaRequest")
+			c.body = ownMediaSchema()
 			c.multipart = true
 		}
 		c.description = "Own-account operations only. Profile name 1..25 characters, status 1..139; photo up to 2 MiB/16 million pixels normalized to square JPEG. Privacy values validated per setting; exception lists are not managed. All mutations require a connected session and 30 second timeout."

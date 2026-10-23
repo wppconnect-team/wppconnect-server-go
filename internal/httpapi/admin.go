@@ -184,7 +184,7 @@ func (s *Server) adminLogout(w http.ResponseWriter, r *http.Request) {
 		delete(s.adminSessions, key)
 		s.adminMu.Unlock()
 	}
-	http.SetCookie(w, &http.Cookie{Name: "wppgo_admin", Path: "/", HttpOnly: true, SameSite: http.SameSiteStrictMode, MaxAge: -1})
+	http.SetCookie(w, &http.Cookie{Name: "wppgo_admin", Path: "/", HttpOnly: true, Secure: r.TLS != nil || r.Header.Get("X-Forwarded-Proto") == "https", SameSite: http.SameSiteStrictMode, MaxAge: -1})
 	writeJSON(w, 200, map[string]any{"status": "success"})
 }
 func (s *Server) adminSessionsList(w http.ResponseWriter, r *http.Request) {

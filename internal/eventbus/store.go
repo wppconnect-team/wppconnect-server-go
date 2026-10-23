@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -224,4 +225,16 @@ func (s *Log) Stats(ctx context.Context) (map[string]int64, error) {
 		out[key] = n
 	}
 	return out, rows.Err()
+}
+func (s *Log) pending(ctx context.Context, targets []string) (int64, error) {
+	if len(targets) == 0 {
+		return 0, nil
+	}
+	args := make([]any, len(targets))
+	for i, name := range targets {
+		args[i] = name
+	}
+	var n int64
+	err := s.db.QueryRowContext(ctx, "SELECT count(*) FROM bus_deliveries WHERE state='pending' AND target IN ("+strings.TrimSuffix(strings.Repeat("?,", len(targets)), ",")+")", args...).Scan(&n)
+	return n, err
 }

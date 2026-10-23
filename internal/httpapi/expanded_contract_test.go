@@ -3,6 +3,7 @@ package httpapi
 import (
 	"bytes"
 	"context"
+	"encoding/base64"
 	"github.com/getkin/kin-openapi/openapi3filter"
 	"github.com/wppconnect-team/wppconnect-server-go/internal/account"
 	"github.com/wppconnect-team/wppconnect-server-go/internal/config"
@@ -39,6 +40,8 @@ func TestExpandedCapabilitiesTCPAgainstOpenAPI(t *testing.T) {
 		{"POST", "/api/alpha/privacy-settings", `{"name":"online","value":"match_last_seen"}`, h.tokens["alpha"], 200},
 		{"POST", "/api/alpha/edit-label", `{"labelId":"1","name":"Test","color":1}`, h.tokens["alpha"], 200},
 		{"POST", "/api/alpha/send-status-text", `{"message":"A status"}`, h.tokens["alpha"], 201},
+		{"POST", "/api/alpha/send-status-media", `{"base64":"` + base64.StdEncoding.EncodeToString(pngData(t)) + `"}`, h.tokens["alpha"], 201},
+		{"POST", "/api/alpha/set-profile-picture", `{"base64":"` + base64.StdEncoding.EncodeToString(pngData(t)) + `"}`, h.tokens["alpha"], 200},
 		{"POST", "/api/alpha/send-carousel", `{}`, h.tokens["alpha"], 501},
 		{"GET", "/api/admin/capabilities", "", token, 200},
 		{"POST", "/api/admin/login", `{"token":"` + token + `"}`, "", 200},

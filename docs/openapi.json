@@ -28037,7 +28037,62 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/MediaRequest"
+                "description": "Decoded media limit 16 MiB. base64/base64Ptt or path containing a base64 data URL is required for JSON. Voice requires Ogg/Opus. Filesystem paths and remote URLs are unsupported.",
+                "properties": {
+                  "base64": {
+                    "type": "string"
+                  },
+                  "base64Ptt": {
+                    "type": "string"
+                  },
+                  "caption": {
+                    "type": "string"
+                  },
+                  "filename": {
+                    "type": "string"
+                  },
+                  "isGroup": {
+                    "type": "boolean"
+                  },
+                  "isLid": {
+                    "enum": [
+                      false
+                    ],
+                    "type": "boolean"
+                  },
+                  "isNewsletter": {
+                    "enum": [
+                      false
+                    ],
+                    "type": "boolean"
+                  },
+                  "message": {
+                    "type": "string"
+                  },
+                  "mimetype": {
+                    "type": "string"
+                  },
+                  "path": {
+                    "type": "string"
+                  },
+                  "phone": {
+                    "oneOf": [
+                      {
+                        "minLength": 1,
+                        "type": "string"
+                      },
+                      {
+                        "items": {
+                          "type": "string"
+                        },
+                        "maxItems": 100,
+                        "minItems": 1,
+                        "type": "array"
+                      }
+                    ]
+                  }
+                },
+                "type": "object"
               }
             },
             "multipart/form-data": {
@@ -30480,7 +30535,62 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/MediaRequest"
+                "description": "Decoded media limit 16 MiB. base64/base64Ptt or path containing a base64 data URL is required for JSON. Voice requires Ogg/Opus. Filesystem paths and remote URLs are unsupported.",
+                "properties": {
+                  "base64": {
+                    "type": "string"
+                  },
+                  "base64Ptt": {
+                    "type": "string"
+                  },
+                  "caption": {
+                    "type": "string"
+                  },
+                  "filename": {
+                    "type": "string"
+                  },
+                  "isGroup": {
+                    "type": "boolean"
+                  },
+                  "isLid": {
+                    "enum": [
+                      false
+                    ],
+                    "type": "boolean"
+                  },
+                  "isNewsletter": {
+                    "enum": [
+                      false
+                    ],
+                    "type": "boolean"
+                  },
+                  "message": {
+                    "type": "string"
+                  },
+                  "mimetype": {
+                    "type": "string"
+                  },
+                  "path": {
+                    "type": "string"
+                  },
+                  "phone": {
+                    "oneOf": [
+                      {
+                        "minLength": 1,
+                        "type": "string"
+                      },
+                      {
+                        "items": {
+                          "type": "string"
+                        },
+                        "maxItems": 100,
+                        "minItems": 1,
+                        "type": "array"
+                      }
+                    ]
+                  }
+                },
+                "type": "object"
               }
             },
             "multipart/form-data": {

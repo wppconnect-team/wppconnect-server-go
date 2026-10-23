@@ -182,11 +182,11 @@ func (b *Bus) worker(offset int) {
 func (b *Bus) Close(ctx context.Context) error {
 	b.closing.Store(true)
 	for len(b.names) > 0 {
-		stats, err := b.Log.Stats(ctx)
+		pending, err := b.Log.pending(ctx, b.names)
 		if err != nil {
 			break
 		}
-		if stats["pending"] == 0 {
+		if pending == 0 {
 			break
 		}
 		select {

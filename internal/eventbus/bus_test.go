@@ -196,3 +196,19 @@ func TestShutdownDeadlineKeepsPending(t *testing.T) {
 		t.Fatal("resources not released after timeout")
 	}
 }
+
+func TestShutdownDoesNotWaitForRemovedTargets(t *testing.T) {
+	store := testLog(t)
+	if _, err := store.Append(context.Background(), "onmessage", "alpha", nil, []string{"removed"}); err != nil {
+		t.Fatal(err)
+	}
+	b, err := New(store, []Target{&testTarget{name: "active", deliver: func(context.Context, Event) error { return nil }}}, DefaultOptions())
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+	if err = b.Close(ctx); err != nil {
+		t.Fatal("removed target delayed shutdown", err)
+	}
+}

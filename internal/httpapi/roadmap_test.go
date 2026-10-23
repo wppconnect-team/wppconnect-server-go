@@ -43,6 +43,13 @@ func (f *fakeMediaClient) MarkRead(ctx context.Context, ids []types.MessageID, a
 }
 
 func (f *roadmapAccount) Self() types.JID { return types.NewJID("999", types.DefaultUserServer) }
+func (f *roadmapAccount) SetGroupPhoto(ctx context.Context, jid types.JID, image []byte) (string, error) {
+	if jid != f.Self() || len(image) == 0 {
+		panic("profile photo must target self")
+	}
+	f.calls++
+	return "photo-id", f.err
+}
 func (f *roadmapAccount) SendAppState(ctx context.Context, _ appstate.PatchInfo) error {
 	if _, ok := ctx.Deadline(); !ok {
 		panic("missing deadline")
@@ -240,5 +247,29 @@ func TestDurableEventHTTPAndWebSocketIsolation(t *testing.T) {
 	_, data, err := ws.Read(ctx)
 	if err != nil || !strings.Contains(string(data), "alpha-event") || strings.Contains(string(data), "private-beta-event") {
 		t.Fatalf("stream: %s %v", data, err)
+	}
+}
+
+func TestHTTPSAdministratorCookiesStaySecureOnLogout(t *testing.T) {
+	token := strings.Repeat("a", 40)
+	router := (&Server{cfg: config.Config{AdminToken: token}}).router()
+	r := httptest.NewRequest("POST", "https://example.test/api/admin/login", strings.NewReader(`{"token":"`+token+`"}`))
+	r.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, r)
+	if w.Code != 200 || !w.Result().Cookies()[0].Secure {
+		t.Fatal("HTTPS login cookie not secure")
+	}
+	var value struct {
+		CSRF string `json:"csrfToken"`
+	}
+	json.Unmarshal(w.Body.Bytes(), &value)
+	r = httptest.NewRequest("POST", "https://example.test/api/admin/logout", nil)
+	r.AddCookie(w.Result().Cookies()[0])
+	r.Header.Set("X-CSRF-Token", value.CSRF)
+	w = httptest.NewRecorder()
+	router.ServeHTTP(w, r)
+	if w.Code != 200 || !w.Result().Cookies()[0].Secure || w.Result().Cookies()[0].MaxAge != -1 {
+		t.Fatal("HTTPS logout cookie not secure")
 	}
 }
