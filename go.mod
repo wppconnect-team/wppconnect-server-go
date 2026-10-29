@@ -5,7 +5,7 @@ go 1.26.10
 require (
 	github.com/coder/websocket v1.8.14
 	github.com/getkin/kin-openapi v0.149.0
-	github.com/go-chi/chi/v5 v5.2.4
+	github.com/go-chi/chi/v5 v5.4.0
 	github.com/google/uuid v1.6.0
 	github.com/minio/minio-go/v7 v7.4.1
 	github.com/nats-io/nats.go v1.55.0
