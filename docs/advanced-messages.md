@@ -62,7 +62,7 @@ after validation and slot acquisition. Client cancellation is propagated.
 ## Complete examples
 
 These Bash examples assume an already connected session. Obtain the session
-token using the [authentication quick start](../README.md#connect-your-first-session).
+token using the [authentication quick start](../documentation/readme-reference.md#connect-your-first-session).
 Do not use the server's `SECRET_KEY` as a Bearer token.
 
 ```bash
