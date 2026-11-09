@@ -16,14 +16,50 @@ import (
 type Client interface {
 	TryFetchPrivacySettings(context.Context, bool) (*types.PrivacySettings, error)
 	SetPrivacySetting(context.Context, types.PrivacySettingType, types.PrivacySetting) (types.PrivacySettings, error)
-	GetBlocklist(context.Context) (*types.Blocklist, error)
-	UpdateBlocklist(context.Context, types.JID, events.BlocklistChangeAction) (*types.Blocklist, error)
+	GetBlocklist(context.Context) (*Blocklist, error)
+	UpdateBlocklist(context.Context, types.JID, events.BlocklistChangeAction) (*Blocklist, error)
 	SetStatusMessage(context.Context, string) error
 	SetGroupPhoto(context.Context, types.JID, []byte) (string, error)
 	SendAppState(context.Context, appstate.PatchInfo) error
 	Self() types.JID
 }
 type SDK struct{ *whatsmeow.Client }
+
+var _ Client = SDK{}
+
+// The HTTP API always returns a complete blocklist. An empty hash disables
+// the SDK's incremental response optimization and preserves that contract.
+type Blocklist struct {
+	DHash string
+	JIDs  []types.JID
+}
+
+func blocklist(result *types.Blocklist, err error) (*Blocklist, error) {
+	if result == nil || err != nil {
+		return nil, err
+	}
+	out := &Blocklist{DHash: result.DHash, JIDs: make([]types.JID, 0, len(result.Items))}
+	for _, item := range result.Items {
+		jid := item.PN
+		if jid.IsEmpty() {
+			jid = item.LID
+		}
+		out.JIDs = append(out.JIDs, jid)
+	}
+	return out, nil
+}
+
+func (s SDK) GetBlocklist(ctx context.Context) (*Blocklist, error) {
+	return blocklist(s.Client.GetBlocklist(ctx, ""))
+}
+
+func (s SDK) UpdateBlocklist(ctx context.Context, jid types.JID, action events.BlocklistChangeAction) (*Blocklist, error) {
+	return blocklist(s.Client.UpdateBlocklist(ctx, jid, action, ""))
+}
+
+func (s SDK) SetStatusMessage(ctx context.Context, text string) error {
+	return s.Client.SetStatusMessage(ctx, types.SetStatusInput{Text: &text})
+}
 
 func (s SDK) Self() types.JID {
 	if s.Store == nil || s.Store.ID == nil {

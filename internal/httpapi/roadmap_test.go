@@ -19,7 +19,6 @@ import (
 	"github.com/wppconnect-team/wppconnect-server-go/internal/eventbus"
 	"github.com/wppconnect-team/wppconnect-server-go/internal/history"
 	"github.com/wppconnect-team/wppconnect-server-go/internal/media"
-	"go.mau.fi/whatsmeow"
 	"go.mau.fi/whatsmeow/appstate"
 	"go.mau.fi/whatsmeow/proto/waE2E"
 	"go.mau.fi/whatsmeow/types"
@@ -27,7 +26,7 @@ import (
 )
 
 type roadmapAccount struct {
-	*whatsmeow.Client
+	account.SDK
 	calls int
 	err   error
 }

@@ -22,6 +22,17 @@ type roundTripFunc func(*http.Request) (*http.Response, error)
 
 func (fn roundTripFunc) RoundTrip(r *http.Request) (*http.Response, error) { return fn(r) }
 
+type decryptionClient struct{ *whatsmeow.Client }
+
+// Exercise the real SDK's integrity/decryption implementation without a live
+// authenticated connection to negotiate media hosts. Descriptor tests cover
+// path normalization separately.
+func (c decryptionClient) DownloadToFile(ctx context.Context, msg whatsmeow.DownloadableMessage, file whatsmeow.File) error {
+	return c.DangerousInternals().DownloadAndDecryptToFile(ctx,
+		"https://mmg.whatsapp.net"+msg.GetDirectPath(), msg.GetMediaKey(),
+		whatsmeow.GetMediaType(msg), msg.GetFileEncSHA256(), msg.GetFileSHA256(), file)
+}
+
 // Use the real SDK decryption path against an in-memory HTTP transport.
 func TestDownloadWithRealSDK(t *testing.T) {
 	for _, kind := range []Kind{Document, Video, Sticker} {
@@ -70,7 +81,7 @@ func testDownloadWithRealSDK(t *testing.T, kind Kind) {
 			if !ok {
 				t.Fatal("descriptor rejected")
 			}
-			got, err := Download(context.Background(), cli, a)
+			got, err := Download(context.Background(), decryptionClient{cli}, a)
 			if tc.corrupt || tc.status != 200 {
 				if err == nil || got != nil {
 					t.Fatal("failed integrity/network response returned content")
