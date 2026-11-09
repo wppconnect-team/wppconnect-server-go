@@ -117,6 +117,16 @@ func TestStoreRejectsArbitraryURLsAndOversizedDescriptors(t *testing.T) {
 	}
 }
 
+func TestLegacyMediaURLUsesNegotiatedHosts(t *testing.T) {
+	msg := imageMessage()
+	msg.ImageMessage.DirectPath = nil
+	msg.ImageMessage.URL = proto.String("https://mmg.whatsapp.net/media?token=fixture")
+	a, ok := Descriptor(msg)
+	if !ok || a.Message.GetDirectPath() != "/media?token=fixture" || a.Message.(*waE2E.ImageMessage).GetURL() != "" {
+		t.Fatal("URL-only history must produce a direct-path descriptor for the current SDK")
+	}
+}
+
 func TestEventContentAndWrappers(t *testing.T) {
 	for _, tc := range []struct {
 		name, kind, body, mime string

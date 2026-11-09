@@ -158,6 +158,10 @@ func attachment(msg *waE2E.Message) (Attachment, bool) {
 			!strings.HasSuffix(strings.ToLower(parsed.Hostname()), ".whatsapp.net") {
 			return Attachment{}, false
 		}
+		// Current WhatsApp clients download through negotiated media hosts.
+		// Preserve older history descriptors that only stored a validated URL.
+		u.DirectPath = parsed.RequestURI()
+		u.URL = ""
 	}
 	// Rebuild a minimal descriptor: no thumbnails, quoted messages or context.
 	minimal := Message(kind, u, source.GetMimetype(), Filename(filename), "")
