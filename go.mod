@@ -61,4 +61,4 @@ require (
 	modernc.org/memory v1.11.0 // indirect
 )
 
-replace go.mau.fi/whatsmeow => github.com/wppconnect-team/whatsmeow v0.0.0-20261108025509-979e4d3f5dad
+replace go.mau.fi/whatsmeow => github.com/wppconnect-team/whatsmeow v0.0.0-20261109024253-800567d5cf16

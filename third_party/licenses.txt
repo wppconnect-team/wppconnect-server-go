@@ -2337,7 +2337,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 
 ========================================================================
-github.com/wppconnect-team/whatsmeow v0.0.0-20261108025509-979e4d3f5dad
+github.com/wppconnect-team/whatsmeow v0.0.0-20261109024253-800567d5cf16
 
 LICENSE
 Mozilla Public License Version 2.0
