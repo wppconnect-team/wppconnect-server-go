@@ -285,7 +285,11 @@ func (m *Manager) Start(ctx context.Context, name string) (*Handle, error) {
 	}
 	m.op.Lock()
 	defer m.op.Unlock()
-	return m.startLocked(ctx, name)
+	h, err := m.startLocked(ctx, name)
+	if err != nil && m.log != nil {
+		m.log.Errorf("session %s: start failed: %v", name, err)
+	}
+	return h, err
 }
 
 func (m *Manager) startLocked(ctx context.Context, name string) (*Handle, error) {
