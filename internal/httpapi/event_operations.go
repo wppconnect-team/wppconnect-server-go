@@ -23,8 +23,8 @@ func (s *Server) eventDeliveries(w http.ResponseWriter, r *http.Request) {
 	if state == "" {
 		state = "failed"
 	}
-	if !slices.Contains([]string{"webhook", "nats", "rabbitmq"}, target) || !slices.Contains([]string{"failed", "pending", "delivered"}, state) {
-		mediaError(w, errors.New("target must be webhook/nats/rabbitmq and state failed/pending/delivered"), "")
+	if !slices.Contains([]string{"webhook", "nats", "rabbitmq", "redis-streams"}, target) || !slices.Contains([]string{"failed", "pending", "delivered"}, state) {
+		mediaError(w, errors.New("target must be webhook/nats/rabbitmq/redis-streams and state failed/pending/delivered"), "")
 		return
 	}
 	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
