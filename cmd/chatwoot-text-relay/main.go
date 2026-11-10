@@ -244,6 +244,11 @@ func (a *relay) recover(ctx context.Context, id int64, key string) bool {
 	return e == nil
 }
 
+// Chatwoot uses Rails has_secure_token, whose default length is 24.
+func validSigningSecret(secret string) bool {
+	return len(secret) >= 24
+}
+
 func main() {
 	positive := func(k string) int64 {
 		n, e := strconv.ParseInt(os.Getenv(k), 10, 64)
@@ -255,7 +260,7 @@ func main() {
 	b := binding{positive("CHATWOOT_ACCOUNT_ID"), positive("CHATWOOT_INBOX_ID"), positive("CHATWOOT_CONVERSATION_ID"), positive("CHATWOOT_CONTACT_ID"), os.Getenv("WPP_SESSION_ID"), os.Getenv("WPP_PHONE")}
 	secret, token := os.Getenv("CHATWOOT_WEBHOOK_SECRET"), os.Getenv("WPP_CLOUD_API_KEY")
 	dir := os.Getenv("RELAY_STATE_DIR")
-	if !regexp.MustCompile("^[A-Za-z0-9_-]{1,100}$").MatchString(b.Session) || !regexp.MustCompile("^[1-9][0-9]{6,14}$").MatchString(b.Phone) || len(secret) < 32 || token == "" || !filepath.IsAbs(dir) {
+	if !regexp.MustCompile("^[A-Za-z0-9_-]{1,100}$").MatchString(b.Session) || !regexp.MustCompile("^[1-9][0-9]{6,14}$").MatchString(b.Phone) || !validSigningSecret(secret) || token == "" || !filepath.IsAbs(dir) {
 		log.Fatal("invalid route, credentials or state directory")
 	}
 	if e := os.MkdirAll(dir, 0700); e != nil {

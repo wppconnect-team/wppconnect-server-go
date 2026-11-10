@@ -6,7 +6,7 @@ Compile com `go build ./cmd/chatwoot-text-relay` e execute o binário com a conf
 | --- | --- |
 | `CHATWOOT_ACCOUNT_ID`, `CHATWOOT_INBOX_ID` | IDs numéricos da conta e da inbox de API dedicada. |
 | `CHATWOOT_CONVERSATION_ID`, `CHATWOOT_CONTACT_ID` | Número da conversa exibido na inbox e ID do contato autorizado. |
-| `CHATWOOT_WEBHOOK_SECRET` | Segredo de assinatura do webhook com pelo menos 32 bytes. |
+| `CHATWOOT_WEBHOOK_SECRET` | Segredo de assinatura do webhook gerado pelo Chatwoot (24 caracteres por padrão). |
 | `WPP_CLOUD_API_KEY`, `WPP_SESSION_ID` | Chave Cloud com escopo `messages:send` e ID da sessão pareada. |
 | `WPP_PHONE` | Número autorizado com código do país e apenas dígitos. |
 | `RELAY_STATE_DIR` | Caminho absoluto de um diretório privado em disco persistente. |
