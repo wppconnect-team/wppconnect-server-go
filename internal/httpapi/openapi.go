@@ -351,10 +351,13 @@ func buildOpenAPI() []byte {
 				params = append(params, schema{"name": key, "in": "query", "schema": boolean(), "description": "Unsupported or conflicting chat type flags are rejected."})
 			}
 		}
-		if c.tag == "history" || name == "events" || name == "events/ws" || name == "stored-media" {
+		if c.tag == "history" || name == "events" || name == "events/ws" || name == "events/deliveries" || name == "events/replay-audit" || name == "stored-media" {
 			for _, key := range []string{"chatId", "cursor", "limit"} {
 				params = append(params, schema{"name": key, "in": "query", "schema": str()})
 			}
+		}
+		if name == "events/deliveries" {
+			params = append(params, schema{"name": "target", "in": "query", "required": true, "schema": schema{"type": "string", "enum": []string{"webhook", "nats", "rabbitmq"}}}, schema{"name": "state", "in": "query", "schema": schema{"type": "string", "enum": []string{"failed", "pending", "delivered"}, "default": "failed"}})
 		}
 		if strings.HasPrefix(name, "admin/") && method != http.MethodGet {
 			params = append(params, schema{"name": "X-CSRF-Token", "in": "header", "schema": str(), "description": "Required for cookie-authenticated writes. Returned by login/auth; Bearer-authenticated calls do not require CSRF."})

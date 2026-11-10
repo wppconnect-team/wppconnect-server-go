@@ -16,6 +16,9 @@ import (
 func (s *Server) eventRoutes(r chi.Router) {
 	r.Get("/api/{session}/events", s.listEvents)
 	r.Post("/api/{session}/events/replay", s.replayEvents)
+	r.Get("/api/{session}/events/deliveries", s.eventDeliveries)
+	r.Post("/api/{session}/events/retry-failed", s.retryFailedEvent)
+	r.Get("/api/{session}/events/replay-audit", s.eventReplayAudit)
 	r.Get("/api/{session}/events/ws", s.streamEvents)
 }
 func eventQuery(r *http.Request) (int64, int, error) {

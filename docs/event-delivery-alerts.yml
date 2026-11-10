@@ -1,0 +1,30 @@
+groups:
+  - name: wppconnect-event-delivery
+    rules:
+      - alert: WPPConnectEventLogNearCapacity
+        expr: (wppconnect_event_log_bytes / wppconnect_event_log_max_bytes > 0.8) or (wppconnect_event_log_events / wppconnect_event_log_max_events > 0.8)
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: WPPConnect event log exceeds 80 percent of configured capacity
+      - alert: WPPConnectWebhookBacklogOld
+        expr: wppconnect_target_oldest_pending_seconds > 120
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: WPPConnect target has pending events older than two minutes
+      - alert: WPPConnectFailedDeliveries
+        expr: wppconnect_target_deliveries{state="failed"} > 0
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: WPPConnect target has failed deliveries awaiting investigation
+      - alert: WPPConnectEventPersistenceRejected
+        expr: increase(wppconnect_rejected_events_total[5m]) > 0
+        labels:
+          severity: critical
+        annotations:
+          summary: WPPConnect could not persist one or more events
