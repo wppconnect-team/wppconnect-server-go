@@ -43,6 +43,9 @@ func catalogView(p types.BusinessProduct) catalogProductView {
 	return catalogProductView{p.ID, p.Name, p.Price, p.Currency, p.Hidden, p.Availability}
 }
 func (s *Server) catalogRoutes(r chi.Router) {
+	for _, op := range []string{createCollection, updateCollection, productVisibility} {
+		r.Post("/api/{session}/"+op, s.writeCatalog(op))
+	}
 	for _, op := range []string{"own-catalog", "own-catalog-product", "own-catalog-collections"} {
 		r.Post("/api/{session}/"+op, s.readCatalog(op))
 	}
@@ -159,6 +162,9 @@ func catalogMismatch(w http.ResponseWriter) {
 	writeJSON(w, 502, map[string]any{"status": "error", "message": "unexpected catalog response from upstream"})
 }
 func catalogContract(name string) (routeContract, bool) {
+	if catalogMutation(name) {
+		return catalogWriteContract(name)
+	}
 	c := routeContract{tag: "business", success: 200}
 	product := requestSchema(catalogProductView{}, "id", "name", "price", "currency", "hidden", "availability")
 	switch name {
