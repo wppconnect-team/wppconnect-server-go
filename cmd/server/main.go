@@ -20,6 +20,7 @@ import (
 	"github.com/wppconnect-team/wppconnect-server-go/internal/eventbus"
 	"github.com/wppconnect-team/wppconnect-server-go/internal/history"
 	"github.com/wppconnect-team/wppconnect-server-go/internal/httpapi"
+	"github.com/wppconnect-team/wppconnect-server-go/internal/sendledger"
 	"github.com/wppconnect-team/wppconnect-server-go/internal/session"
 	"github.com/wppconnect-team/wppconnect-server-go/internal/vault"
 )
@@ -57,6 +58,11 @@ func run(ctx context.Context, cfg config.Config) error {
 	if err := os.MkdirAll(cfg.DataDir, 0700); err != nil {
 		return err
 	}
+	sends, err := sendledger.Open(filepath.Join(cfg.DataDir, ".sends.db"))
+	if err != nil {
+		return err
+	}
+	defer sends.Close()
 	eventLog, err := eventbus.Open(filepath.Join(cfg.DataDir, ".events.db"))
 	if err != nil {
 		return err
@@ -137,7 +143,7 @@ func run(ctx context.Context, cfg config.Config) error {
 	defer cancelJobs()
 	cleanupDone := make(chan struct{})
 	go func() { defer close(cleanupDone); cleanMedia(jobsCtx, cfg, mgr, mediaVault) }()
-	server := &http.Server{Handler: httpapi.NewRouterWithServices(cfg, mgr, httpapi.Services{Events: sink, Media: mediaVault}), ReadHeaderTimeout: 10 * time.Second, IdleTimeout: 60 * time.Second, MaxHeaderBytes: 32 << 10}
+	server := &http.Server{Handler: httpapi.NewRouterWithServices(cfg, mgr, httpapi.Services{Events: sink, Media: mediaVault, Sends: sends}), ReadHeaderTimeout: 10 * time.Second, IdleTimeout: 60 * time.Second, MaxHeaderBytes: 32 << 10}
 	served := make(chan error, 1)
 	go func() { served <- server.Serve(listener) }()
 	log.Printf("wppconnect-server-go listening on :%s", cfg.Port)
