@@ -8,6 +8,7 @@ services:
       PORT: "21465"
       SECRET_KEY: "${SECRET_KEY:?Set SECRET_KEY in Portainer}"
       WEBHOOK_URL: "${WEBHOOK_URL:-}"
+      WEBHOOK_SECRET: "${WEBHOOK_SECRET:-}"
       DATA_DIR: "/data"
       AUTO_RESTORE_SESSIONS: "${AUTO_RESTORE_SESSIONS:-true}"
       SHUTDOWN_TIMEOUT: "${SHUTDOWN_TIMEOUT:-25s}"

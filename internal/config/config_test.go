@@ -42,3 +42,21 @@ func TestOperationalDefaultsAndInvalidSettings(t *testing.T) {
 		})
 	}
 }
+
+func TestWebhookSigningConfiguration(t *testing.T) {
+	t.Setenv("WEBHOOK_SECRET", "")
+	cfg, err := Load()
+	if err != nil || cfg.WebhookSecret != "" {
+		t.Fatal("signing should be optional")
+	}
+	t.Setenv("WEBHOOK_SECRET", "short-private-key")
+	if _, err := Load(); err == nil || strings.Contains(err.Error(), "short-private-key") {
+		t.Fatal("weak key accepted or leaked in validation error")
+	}
+	secret := strings.Repeat("a", 32)
+	t.Setenv("WEBHOOK_SECRET", secret)
+	cfg, err = Load()
+	if err != nil || cfg.WebhookSecret != secret {
+		t.Fatal("signing key was not loaded")
+	}
+}

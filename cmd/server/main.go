@@ -69,6 +69,7 @@ func run(ctx context.Context, cfg config.Config) error {
 			eventLog.Close()
 			return e
 		}
+		target.SigningSecret = cfg.WebhookSecret
 		targets = append(targets, target)
 	}
 	if cfg.NATSURL != "" {

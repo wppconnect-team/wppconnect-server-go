@@ -3,6 +3,9 @@ package eventbus
 import (
 	"bytes"
 	"context"
+	"crypto/hmac"
+	"crypto/sha256"
+	"encoding/hex"
 	"errors"
 	"io"
 	"net"
@@ -20,6 +23,8 @@ import (
 type HTTP struct {
 	URL    string
 	Client *http.Client
+	// SigningSecret is configured at startup, never persisted with an event.
+	SigningSecret string
 }
 
 func NewHTTP(target string) (*HTTP, error) {
@@ -39,6 +44,15 @@ func (h *HTTP) Deliver(ctx context.Context, e Event) error {
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("X-WPP-Event-ID", e.ID)
 	req.Header.Set("X-WPP-Attempt", strconv.Itoa(e.Attempt))
+	if h.SigningSecret != "" {
+		timestamp := strconv.FormatInt(time.Now().Unix(), 10)
+		mac := hmac.New(sha256.New, []byte(h.SigningSecret))
+		// Bind the delivery identity as well as the exact body and fresh timestamp.
+		io.WriteString(mac, timestamp+"."+e.ID+"."+strconv.Itoa(e.Attempt)+".")
+		mac.Write(e.Data)
+		req.Header.Set("X-WPP-Timestamp", timestamp)
+		req.Header.Set("X-WPP-Signature", "v1="+hex.EncodeToString(mac.Sum(nil)))
+	}
 	resp, err := h.Client.Do(req)
 	if err != nil {
 		return errors.New("webhook transport failed")

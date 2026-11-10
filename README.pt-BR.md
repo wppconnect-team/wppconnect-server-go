@@ -51,6 +51,7 @@ A execução pelos fontes lê diretamente as variáveis de ambiente e não carre
 ## Documentação
 
 - [Contrato da API](./docs/openapi.json)
+- [Assinaturas HMAC opcionais de webhooks](./docs/webhook-signatures.md) (builds com suporte a assinatura)
 - [Matriz de compatibilidade](./docs/compatibility.pt-BR.md)
 - [Guia de operação](./docs/operation.pt-BR.md)
 - [Docker e Portainer](./docs/docker-portainer.pt-BR.md)

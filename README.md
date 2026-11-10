@@ -51,6 +51,7 @@ Source execution reads environment variables directly and does not load `.env` a
 ## Documentation
 
 - [API contract](./docs/openapi.json)
+- [Optional webhook HMAC signatures](./docs/webhook-signatures.md) (source builds with signing support)
 - [Compatibility matrix](./docs/compatibility.pt-BR.md)
 - [Operation guide](./docs/operation.pt-BR.md)
 - [Docker and Portainer](./docs/docker-portainer.pt-BR.md)

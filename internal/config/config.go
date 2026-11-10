@@ -17,6 +17,7 @@ type Config struct {
 	Port                                                     string
 	SecretKey                                                string
 	WebhookURL                                               string
+	WebhookSecret                                            string
 	DataDir                                                  string
 	AutoRestore                                              bool
 	ShutdownTimeout                                          time.Duration
@@ -43,11 +44,12 @@ type Config struct {
 // Node server uses where applicable.
 func Load() (Config, error) {
 	cfg := Config{
-		Port:       getEnv("PORT", "21465"),
-		SecretKey:  getEnv("SECRET_KEY", "THISISMYSECURETOKEN"),
-		WebhookURL: getEnv("WEBHOOK_URL", ""),
-		DataDir:    getEnv("DATA_DIR", "./userDataDir"),
-		AdminToken: os.Getenv("ADMIN_TOKEN"), NATSURL: os.Getenv("NATS_URL"), RabbitMQURL: os.Getenv("AMQP_URL"),
+		Port:          getEnv("PORT", "21465"),
+		SecretKey:     getEnv("SECRET_KEY", "THISISMYSECURETOKEN"),
+		WebhookURL:    getEnv("WEBHOOK_URL", ""),
+		WebhookSecret: os.Getenv("WEBHOOK_SECRET"),
+		DataDir:       getEnv("DATA_DIR", "./userDataDir"),
+		AdminToken:    os.Getenv("ADMIN_TOKEN"), NATSURL: os.Getenv("NATS_URL"), RabbitMQURL: os.Getenv("AMQP_URL"),
 		S3Endpoint: os.Getenv("S3_ENDPOINT"), S3AccessKey: os.Getenv("S3_ACCESS_KEY_ID"), S3SecretKey: os.Getenv("S3_SECRET_ACCESS_KEY"), S3Bucket: os.Getenv("S3_BUCKET"), S3Region: os.Getenv("S3_REGION"),
 	}
 	var err error
@@ -65,6 +67,9 @@ func Load() (Config, error) {
 	}
 	if cfg.AdminToken != "" && len(cfg.AdminToken) < 32 {
 		return cfg, fmt.Errorf("ADMIN_TOKEN must contain at least 32 bytes")
+	}
+	if cfg.WebhookSecret != "" && len(cfg.WebhookSecret) < 32 {
+		return cfg, fmt.Errorf("WEBHOOK_SECRET must contain at least 32 bytes")
 	}
 	for _, item := range []struct {
 		key, fallback string
