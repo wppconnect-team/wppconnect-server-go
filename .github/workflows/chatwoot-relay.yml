@@ -3,13 +3,17 @@ on:
   pull_request:
     paths:
       - 'cmd/chatwoot-text-relay/**'
-      - 'scripts/chatwoot-signature-fixture.rb'
+      - 'scripts/chatwoot-*.rb'
+      - 'scripts/test-chatwoot-inbox.sh'
+      - 'internal/media/event.go'
       - '.github/workflows/chatwoot-relay.yml'
   push:
     branches: [main]
     paths:
       - 'cmd/chatwoot-text-relay/**'
-      - 'scripts/chatwoot-signature-fixture.rb'
+      - 'scripts/chatwoot-*.rb'
+      - 'scripts/test-chatwoot-inbox.sh'
+      - 'internal/media/event.go'
       - '.github/workflows/chatwoot-relay.yml'
   workflow_dispatch:
 permissions:
@@ -33,3 +37,31 @@ jobs:
           umask 077
           docker run --rm -i --network none --entrypoint bundle "$CHATWOOT_TEST_IMAGE" exec ruby - < scripts/chatwoot-signature-fixture.rb > "$CHATWOOT_SIGNATURE_FIXTURE"
           go test ./cmd/chatwoot-text-relay -count=1 -run '^TestChatwootReleaseCallback$' -v
+  api-inbox:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_DB: chatwoot
+          POSTGRES_PASSWORD: local-fixture
+        ports:
+          - 5432:5432
+        options: --health-cmd pg_isready --health-interval 3s --health-timeout 5s --health-retries 20
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+      - name: Exchange text with a local Chatwoot API inbox
+        env:
+          POSTGRES_PASSWORD: local-fixture
+          CHATWOOT_TEST_IMAGE: chatwoot/chatwoot@sha256:a0d571a3a2f78f4fa4b1d7c21a53309c0184068d6021b3664ab37788faef04c1
+        run: bash scripts/test-chatwoot-inbox.sh
