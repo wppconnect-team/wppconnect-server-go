@@ -135,7 +135,7 @@ func extendedContract(name string) (routeContract, bool) {
 			c.description += " Legacy replay requeues all enabled targets, including delivered targets; prefer retry-failed for failure recovery. Audit records use actorType legacy-api."
 		}
 		if name == "events/deliveries" {
-			c.description += " Requires target=webhook|nats|rabbitmq|redis-streams; state=failed (default)|pending|delivered. Returns metadata only, including safe failureCode. Cursor is event ingestion sequence for this target; restart from zero to find an older event whose state changed."
+			c.description += " Requires target=webhook|nats|rabbitmq|redis-streams|sqs; state=failed (default)|pending|delivered. Returns metadata only, including safe failureCode. Cursor is event ingestion sequence for this target; restart from zero to find an older event whose state changed."
 		}
 		if name == "events/retry-failed" {
 			c.success = 202

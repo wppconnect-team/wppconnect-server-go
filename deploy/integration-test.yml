@@ -8,6 +8,9 @@ services:
       interval: 2s
       timeout: 2s
       retries: 20
+  sqs:
+    image: softwaremill/elasticmq-native:1.7.1
+    ports: ["127.0.0.1:19324:9324"]
   nats:
     image: nats:2-alpine
     ports: ["127.0.0.1:14222:4222"]

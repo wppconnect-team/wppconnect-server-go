@@ -13,6 +13,7 @@ import (
 // intentionally aligned with the Node server so clients can migrate with the
 // same mental model (secretKey auth, webhook URL, port).
 type Config struct {
+	SQSQueueURL, SQSRegion                                   string
 	RedisStreamURL, RedisStreamKey                           string
 	RedisStreamMaxLen                                        int
 	WebhookPublicOnly                                        bool
@@ -47,10 +48,11 @@ type Config struct {
 // Node server uses where applicable.
 func Load() (Config, error) {
 	cfg := Config{
-		Port:           getEnv("PORT", "21465"),
-		SecretKey:      getEnv("SECRET_KEY", "THISISMYSECURETOKEN"),
-		WebhookURL:     getEnv("WEBHOOK_URL", ""),
-		WebhookSecret:  os.Getenv("WEBHOOK_SECRET"),
+		Port:          getEnv("PORT", "21465"),
+		SecretKey:     getEnv("SECRET_KEY", "THISISMYSECURETOKEN"),
+		WebhookURL:    getEnv("WEBHOOK_URL", ""),
+		WebhookSecret: os.Getenv("WEBHOOK_SECRET"),
+		SQSQueueURL:   os.Getenv("SQS_QUEUE_URL"), SQSRegion: os.Getenv("AWS_REGION"),
 		RedisStreamURL: os.Getenv("REDIS_STREAM_URL"), RedisStreamKey: getEnv("REDIS_STREAM_KEY", "wppconnect.events"),
 		DataDir:    getEnv("DATA_DIR", "./userDataDir"),
 		AdminToken: os.Getenv("ADMIN_TOKEN"), NATSURL: os.Getenv("NATS_URL"), RabbitMQURL: os.Getenv("AMQP_URL"),

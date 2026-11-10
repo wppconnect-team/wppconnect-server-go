@@ -9,7 +9,7 @@ curl "$SERVER/api/$SESSION/events/deliveries?target=webhook&state=failed&limit=5
   -H "Authorization: Bearer $TOKEN"
 ```
 
-`target` is required: `webhook`, `nats`, `rabbitmq` or `redis-streams`. `state` is `failed`
+`target` is required: `webhook`, `nats`, `rabbitmq`, `redis-streams` or `sqs`. `state` is `failed`
 (default), `pending` or `delivered`. `cursor` is an event ingestion sequence,
 initially zero; `limit` is 1..200. Keep the target and state unchanged while
 paging. This is a live view, not a frozen snapshot: restart from zero to discover
@@ -99,3 +99,13 @@ Leave `REDIS_STREAM_URL` empty to disable the target. Only the runtime operator 
 A successful delivery means Redis acknowledged the append. It does not confirm consumer processing, replica acknowledgement or a disk flush. Consumers must deduplicate by `eventId`, not the Redis stream entry ID: after a lost reply, replay can append a second entry for the same event. Retain deduplication records through your replay window. The existing SQLite outbox controls attempts, failure reporting and selective replay; use `target=redis-streams` when investigating. Moving the configured destination also changes where future retries for this target are delivered.
 
 For an isolated integration test use the Redis service in `deploy/integration-test.yml` and set `INTEGRATION_REDIS_URL=redis://127.0.0.1:16379/0`. The test uses a unique key, forces a wrong-type rejection, recovers, publishes through a second client, and checks exact trimming and preservation of identity and payload.
+
+## Amazon SQS (opt-in)
+
+Configure a pre-existing queue with `SQS_QUEUE_URL=https://sqs.REGION.amazonaws.com/ACCOUNT/QUEUE` and `AWS_REGION=REGION`. An empty URL disables SQS. Use the container's AWS credential chain (prefer a workload role), granting only `sqs:SendMessage` for this ARN and the required key permissions if using a customer-managed KMS key. The adapter does not create queues, alter policies, or consume production messages. Only canonical regional AWS commercial endpoints are supported. Isolate queues and access policies between customers: every session in one server process shares its configured target.
+
+The body is the original event JSON. The message attributes `eventId`, `session` and `event` preserve identity and type. For a queue ending in `.fifo`, the session is the message group and the stable event ID is the deduplication ID. AWS FIFO deduplication has a limited time window. Standard queues can redeliver messages, and multiple outbox workers may publish in a different order than ingestion. Deduplicate in the consumer for the entire replay window.
+
+A confirmed append is a successful SendMessage response with a message ID. It does not mean that a consumer processed the message. The adapter reserves 2 KiB of the SQS 1 MiB message budget for attributes; an oversized body fails without truncation. The durable outbox controls retries, inspection and replay via `target=sqs`; an ambiguous transport failure can result in duplicate delivery. See the [AWS SendMessage contract](https://docs.aws.amazon.com/AWSSimpleQueueService/latest/APIReference/API_SendMessage.html).
+
+CI runs the SDK against an isolated ElasticMQ service. The fixture creates a temporary FIFO queue, checks rejection by a missing queue, publishes the same event twice, consumes it, checks the body/group/identity, and confirms no second message remains. These checks do not verify a production AWS account's IAM or KMS settings.

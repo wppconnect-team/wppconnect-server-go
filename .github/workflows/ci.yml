@@ -55,6 +55,7 @@ jobs:
         env:
           INTEGRATION_REQUIRED: '1'
           INTEGRATION_REDIS_URL: redis://127.0.0.1:16379/0
+          INTEGRATION_SQS_ENDPOINT: http://127.0.0.1:19324
           INTEGRATION_NATS_URL: nats://127.0.0.1:14222
           INTEGRATION_AMQP_URL: amqp://integration:integration-only-password@127.0.0.1:15673/
           INTEGRATION_S3_ENDPOINT: 127.0.0.1:19000
