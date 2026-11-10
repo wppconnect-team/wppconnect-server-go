@@ -60,3 +60,21 @@ func TestWebhookSigningConfiguration(t *testing.T) {
 		t.Fatal("signing key was not loaded")
 	}
 }
+
+func TestPublicWebhookConfigurationRequiresSigning(t *testing.T) {
+	t.Setenv("WEBHOOK_PUBLIC_ONLY", "true")
+	t.Setenv("WEBHOOK_URL", "https://example.com/events")
+	t.Setenv("WEBHOOK_SECRET", "")
+	if _, err := Load(); err == nil {
+		t.Fatal("public-only receiver accepted without a signing secret")
+	}
+	t.Setenv("WEBHOOK_SECRET", strings.Repeat("s", 32))
+	cfg, err := Load()
+	if err != nil || !cfg.WebhookPublicOnly {
+		t.Fatal("public-only mode was not loaded")
+	}
+	t.Setenv("WEBHOOK_PUBLIC_ONLY", "maybe")
+	if _, err := Load(); err == nil {
+		t.Fatal("invalid public-only flag accepted")
+	}
+}
