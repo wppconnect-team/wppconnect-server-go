@@ -1,4 +1,5 @@
 require "active_record"
+require "active_support/core_ext/securerandom"
 require "active_support/core_ext/object/blank"
 require "json"
 require "openssl"
