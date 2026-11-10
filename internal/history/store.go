@@ -12,10 +12,10 @@ import (
 	"sync"
 	"time"
 
-	"github.com/wppconnect-team/wppconnect-server-go/internal/media"
 	"github.com/polymorfa/hypermeow/proto/waE2E"
 	"github.com/polymorfa/hypermeow/types"
 	"github.com/polymorfa/hypermeow/types/events"
+	"github.com/wppconnect-team/wppconnect-server-go/internal/media"
 	"google.golang.org/protobuf/proto"
 	_ "modernc.org/sqlite"
 )
@@ -131,7 +131,7 @@ func (s *Store) Put(ctx context.Context, info types.MessageInfo, msg *waE2E.Mess
 	if err != nil {
 		return err
 	}
-	content := media.Event(&events.Message{Info: info, Message: msg})
+	content := historyContent(info, msg)
 	encoded, err := json.Marshal(content)
 	if err != nil {
 		return err
@@ -161,6 +161,14 @@ func (s *Store) Put(ctx context.Context, info types.MessageInfo, msg *waE2E.Mess
 	return tx.Commit()
 }
 
+// History may receive an already unwrapped message. The live webhook marker
+// relies on the original envelope and must never be inferred from history.
+func historyContent(info types.MessageInfo, msg *waE2E.Message) map[string]any {
+	content := media.Event(&events.Message{Info: info, Message: msg})
+	delete(content, "persistentText")
+	return content
+}
+
 func scan(row interface{ Scan(...any) error }) (Record, error) {
 	var r Record
 	var content, raw []byte
@@ -174,6 +182,8 @@ func scan(row interface{ Scan(...any) error }) (Record, error) {
 	if err = json.Unmarshal(content, &r.Content); err != nil {
 		return r, err
 	}
+	// Older databases can contain the marker derived from unwrapped content.
+	delete(r.Content, "persistentText")
 	r.Message = &waE2E.Message{}
 	if len(raw) > 0 {
 		err = proto.Unmarshal(raw, r.Message)
@@ -333,7 +343,7 @@ func (s *Store) ChangeAt(ctx context.Context, chat, id string, replacement *waE2
 	if err != nil {
 		return err
 	}
-	data := media.Event(&events.Message{Info: r.Info(), Message: replacement})
+	data := historyContent(r.Info(), replacement)
 	data["updatedAt"] = at
 	content, err := json.Marshal(data)
 	if err != nil {

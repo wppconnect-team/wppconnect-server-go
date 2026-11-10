@@ -34,7 +34,11 @@ func ordinaryText(evt *events.Message) bool {
 	if raw == nil || evt.IsEphemeral || evt.IsViewOnce || evt.IsViewOnceV2 || evt.IsViewOnceV2Extension || len(raw.ProtoReflect().GetUnknown()) != 0 {
 		return false
 	}
-	ctx := raw.GetExtendedTextMessage().GetContextInfo()
+	extended := raw.GetExtendedTextMessage()
+	if extended.GetViewOnce() || evt.Message.GetExtendedTextMessage().GetViewOnce() {
+		return false
+	}
+	ctx := extended.GetContextInfo()
 	if ctx.GetExpiration() != 0 || ctx.GetEphemeralSettingTimestamp() != 0 || ctx.GetDisappearingMode() != nil || len(ctx.GetEphemeralSharedSecret()) != 0 {
 		return false
 	}

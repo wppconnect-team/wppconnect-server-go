@@ -202,3 +202,35 @@ func TestHistoryConcurrentAndInvalidInput(t *testing.T) {
 		t.Fatal("large message accepted")
 	}
 }
+
+func TestHistoryNeverInfersLiveTextEligibility(t *testing.T) {
+	store := openTest(t, DefaultOptions())
+	ctx := context.Background()
+	source := info("wrapped")
+	chat := source.Chat.String()
+	plain := &waE2E.Message{Conversation: proto.String("retained text")}
+	wrapped := &waE2E.Message{EphemeralMessage: &waE2E.FutureProofMessage{Message: plain}}
+	if err := store.Put(ctx, source, wrapped); err != nil {
+		t.Fatal(err)
+	}
+	check := func() {
+		t.Helper()
+		record, err := store.Get(ctx, chat, source.ID)
+		if err != nil || record.Message.GetConversation() != "retained text" {
+			t.Fatal("ordinary history projection changed", err)
+		}
+		if _, ok := record.Content["persistentText"]; ok {
+			t.Fatal("history reported live eligibility")
+		}
+	}
+	check()
+	if err := store.Change(ctx, chat, source.ID, plain); err != nil {
+		t.Fatal(err)
+	}
+	check()
+	// A row written by an older release retains its original JSON on disk.
+	if _, err := store.db.ExecContext(ctx, "UPDATE history_messages SET content=json_set(content,'$.persistentText',json('true')) WHERE chat=? AND id=?", chat, source.ID); err != nil {
+		t.Fatal(err)
+	}
+	check()
+}
