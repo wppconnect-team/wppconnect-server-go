@@ -1,10 +1,11 @@
 package media
 
 import (
+	"strings"
+
 	"github.com/polymorfa/hypermeow/proto/waE2E"
 	"github.com/polymorfa/hypermeow/types/events"
 	"google.golang.org/protobuf/reflect/protoreflect"
-	"strings"
 )
 
 func bounded(value string, size int) string {
@@ -34,7 +35,7 @@ func ordinaryText(evt *events.Message) bool {
 		return false
 	}
 	ctx := raw.GetExtendedTextMessage().GetContextInfo()
-	if ctx.GetExpiration() != 0 || ctx.GetEphemeralSettingTimestamp() != 0 || ctx.GetDisappearingMode() != nil {
+	if ctx.GetExpiration() != 0 || ctx.GetEphemeralSettingTimestamp() != 0 || ctx.GetDisappearingMode() != nil || len(ctx.GetEphemeralSharedSecret()) != 0 {
 		return false
 	}
 	plain := raw.GetConversation() != "" || raw.GetExtendedTextMessage().GetText() != ""
