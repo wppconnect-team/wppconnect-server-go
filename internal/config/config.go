@@ -13,6 +13,7 @@ import (
 // intentionally aligned with the Node server so clients can migrate with the
 // same mental model (secretKey auth, webhook URL, port).
 type Config struct {
+	WebhookPublicOnly                                        bool
 	ExperimentalInteractives                                 bool
 	Port                                                     string
 	SecretKey                                                string
@@ -53,6 +54,10 @@ func Load() (Config, error) {
 		S3Endpoint: os.Getenv("S3_ENDPOINT"), S3AccessKey: os.Getenv("S3_ACCESS_KEY_ID"), S3SecretKey: os.Getenv("S3_SECRET_ACCESS_KEY"), S3Bucket: os.Getenv("S3_BUCKET"), S3Region: os.Getenv("S3_REGION"),
 	}
 	var err error
+	cfg.WebhookPublicOnly, err = strconv.ParseBool(getEnv("WEBHOOK_PUBLIC_ONLY", "false"))
+	if err != nil {
+		return cfg, fmt.Errorf("invalid WEBHOOK_PUBLIC_ONLY")
+	}
 	cfg.ExperimentalInteractives, err = strconv.ParseBool(getEnv("ENABLE_EXPERIMENTAL_INTERACTIVES", "false"))
 	if err != nil {
 		return cfg, fmt.Errorf("invalid ENABLE_EXPERIMENTAL_INTERACTIVES")
@@ -67,6 +72,9 @@ func Load() (Config, error) {
 	}
 	if cfg.AdminToken != "" && len(cfg.AdminToken) < 32 {
 		return cfg, fmt.Errorf("ADMIN_TOKEN must contain at least 32 bytes")
+	}
+	if cfg.WebhookPublicOnly && cfg.WebhookURL != "" && cfg.WebhookSecret == "" {
+		return cfg, fmt.Errorf("WEBHOOK_SECRET is required for public-only webhooks")
 	}
 	if cfg.WebhookSecret != "" && len(cfg.WebhookSecret) < 32 {
 		return cfg, fmt.Errorf("WEBHOOK_SECRET must contain at least 32 bytes")

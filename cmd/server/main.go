@@ -64,7 +64,11 @@ func run(ctx context.Context, cfg config.Config) error {
 	eventLog.Limit, eventLog.MaxBytes, eventLog.Retention = cfg.OutboxMaxEvents, cfg.OutboxMaxBytes, cfg.OutboxRetention
 	targets := []eventbus.Target{}
 	if cfg.WebhookURL != "" {
-		target, e := eventbus.NewHTTP(cfg.WebhookURL)
+		factory := eventbus.NewHTTP
+		if cfg.WebhookPublicOnly {
+			factory = eventbus.NewPublicHTTP
+		}
+		target, e := factory(cfg.WebhookURL)
 		if e != nil {
 			eventLog.Close()
 			return e

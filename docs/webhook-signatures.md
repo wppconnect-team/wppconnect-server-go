@@ -58,3 +58,20 @@ HTTP redirects remain disabled. The signing configuration applies to the global
 the `start-session` webhook parameter effective. Rotate keys by allowing the
 previous and new key briefly on the receiver, restarting the server with the new
 key, then removing the old receiver key after the freshness window has elapsed.
+
+
+## Tenant-supplied receivers
+
+Set WEBHOOK_PUBLIC_ONLY=true for untrusted destinations. This mode requires a
+signing secret and an HTTPS receiver on port 443, rejects URL credentials and
+fragments, disables environment proxies and redirects, and validates DNS answers
+on every new connection. Private, loopback, link-local, multicast, documentation
+and reserved addresses are rejected before dialing; mixed public/private DNS
+answers fail closed. Connections dial the validated IP directly while TLS still
+verifies the original hostname. Keep network-level egress controls as well.
+
+Managed Cloud provisions a separate container for each configured receiver.
+A receiver is configured before starting the WhatsApp session and remains in
+Docker configuration across restarts. It is not a dynamic receiver shared among
+tenants. Changing an active receiver requires an explicit controlled rollout;
+this feature does not silently redirect an existing event backlog.
