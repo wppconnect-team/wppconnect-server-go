@@ -113,3 +113,6 @@ CI runs the SDK against an isolated ElasticMQ service. The fixture creates a tem
 For a separate authenticated n8n receiver with its own retry state, see the [workflow, setup and test](../examples/n8n/README.md).
 
 For n8n, SQS and Redis Streams only, QR events have a deliberately reduced body with event, session and available=true. The live device-link code is never forwarded to these destinations, including on replay. Other events use their original JSON.
+
+
+The Redis backlog integration test publishes 32 events from two sessions through four production outbox workers. A temporary key of the wrong type rejects every Redis append while the HTTP receiver accepts its deliveries. After the workers and SQLite store reopen, the fixture restores the stream and replays only its failed deliveries. It checks event IDs and session payloads at both destinations, replay audit entries, cross-session rejection and one HTTP delivery per event. Run `go test -race ./internal/eventbus -run TestIntegrationRedisBacklogReplayAcrossRestart -count=1` with `INTEGRATION_REDIS_URL` pointing to a disposable Redis service.
