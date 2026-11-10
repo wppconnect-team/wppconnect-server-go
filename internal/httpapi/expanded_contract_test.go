@@ -42,7 +42,7 @@ func TestExpandedCapabilitiesTCPAgainstOpenAPI(t *testing.T) {
 		{"POST", "/api/alpha/send-status-text", `{"message":"A status"}`, h.tokens["alpha"], 201},
 		{"POST", "/api/alpha/send-status-media", `{"base64":"` + base64.StdEncoding.EncodeToString(pngData(t)) + `"}`, h.tokens["alpha"], 201},
 		{"POST", "/api/alpha/set-profile-picture", `{"base64":"` + base64.StdEncoding.EncodeToString(pngData(t)) + `"}`, h.tokens["alpha"], 200},
-		{"POST", "/api/alpha/send-carousel", `{}`, h.tokens["alpha"], 501},
+		{"POST", "/api/alpha/send-carousel", `{"phone":"123","body":"Select","cards":[{"body":"A","imageBase64":"c2FtcGxl","buttons":[{"id":"a","label":"A"}]},{"body":"B","imageBase64":"c2FtcGxl","buttons":[{"id":"b","label":"B"}]}]}`, h.tokens["alpha"], 501},
 		{"GET", "/api/admin/capabilities", "", token, 200},
 		{"POST", "/api/admin/login", `{"token":"` + token + `"}`, "", 200},
 	} {

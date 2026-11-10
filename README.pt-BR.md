@@ -31,7 +31,7 @@ Para integradores que exploram um runtime Go e a migração gradual de rotas sel
 
 - Sessões, pareamento por QR/telefone, tokens vinculados à sessão, mensagens de texto/mídia, contatos, grupos e presença.
 - Persistência SQLite, webhooks, verificações de saúde/prontidão e OpenAPI.
-- Os fontes ampliados incluem replay/adaptadores, mídia S3 privada, métricas e interface administrativa opcional. Botões/listas são experimentais e exigem opt-in; carrosséis retornam 501.
+- Os fontes ampliados incluem replay/adaptadores, mídia S3 privada, métricas e interface administrativa opcional. Botões/listas são experimentais e exigem opt-in; carrosséis com botões de resposta são experimentais e desativados por padrão.
 
 ## Primeiros passos
 
