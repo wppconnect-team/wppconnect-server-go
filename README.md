@@ -35,7 +35,7 @@ For integrators exploring a Go runtime and gradual migration from selected WPPCo
 
 - Sessions, QR/phone pairing, session-bound tokens, text/media messages, contacts, groups and presence.
 - SQLite persistence, webhooks, health/readiness checks and OpenAPI.
-- Expanded source includes replay/adapters, private S3 media, metrics and an optional management UI. Buttons/lists are opt-in experimental; carousels return 501.
+- Expanded source includes replay/adapters, private S3 media, metrics and an optional management UI. Buttons, lists and image carousels with quick replies are experimental and disabled by default.
 
 ## Getting started
 

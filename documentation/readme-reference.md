@@ -84,7 +84,7 @@ labels, durable event replay, WebSocket/RabbitMQ/NATS adapters, private S3 media
 phone pairing, per-session settings, Prometheus metrics and an optional English
 management console at `/manager`. Communities, newsletters, status and poll
 voting use native SDK operations. Buttons/lists are opt-in experimental;
-carousels explicitly return `501`. No live WhatsApp account was used in tests.
+image carousels with quick replies require explicit experimental opt-in. No live WhatsApp account was used in tests.
 
 ## Quick start
 
@@ -441,7 +441,7 @@ The eight legacy history operations now query the observed archive with cursor
 envelopes. They do not provide a complete browser inbox. Label/community filters
 are supported using observed labels and joined community metadata. Additional
 limits and endpoint examples are in the [expanded guide](../docs/roadmap-completion.md).
-Carousel delivery returns `501`; buttons/lists are experimental and disabled by
+Image carousels with quick replies and buttons/lists are experimental and disabled by
 default. Business catalog/templates and call media transport remain outside the
 implemented scope. Universal client/account compatibility is not promised.
 
@@ -567,7 +567,7 @@ bounded inputs, session authorization, tests and an OpenAPI contract.
 
 This does not establish full Evolution Go parity: contracts differ, the console
 has a deliberately scoped workflow, buttons/lists remain experimental and
-carousels, business catalogs/templates and call media are unsupported. Live
+client-specific carousel rendering, business templates and call media remain unverified. See the native own-catalog read routes for scoped product data. Live
 WhatsApp validation was omitted at the user's request. The pinned benchmark is
 historical evidence; the completion guide describes the current source.
 

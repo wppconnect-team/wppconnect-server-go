@@ -222,3 +222,13 @@ timeouts, event normalization and HTTP webhook delivery. HTTP flows over TCP are
 validated against the exported [OpenAPI](openapi.json). Real SDK download tests
 cover video/sticker encryption keys, corrupt payloads and network errors using
 in-memory transport. Fuzz seeds include real synthetic MP4/WebP fixtures.
+
+## Experimental image carousel (Z126)
+
+Set `ENABLE_EXPERIMENTAL_INTERACTIVES=true` on a dedicated runtime to enable `POST /api/{session}/send-carousel`. The default is disabled (501). Use a session token, application/json and optionally the persistent Idempotency-Key to suppress duplicate uploads and sends on replay.
+
+```json
+{"phone":"5511999999999","body":"Choose a color","cards":[{"body":"Blue","imageBase64":"BASE64_PNG_BLUE","buttons":[{"id":"blue","label":"Blue"}]},{"body":"Green","imageBase64":"BASE64_JPEG_GREEN","buttons":[{"id":"green","label":"Green"}]}]}
+```
+
+Use 2..10 cards, 1..3 quick replies per card, unique IDs across all cards, a positive image size up to 4096x4096 and 1 MiB (JPEG/PNG only). The complete JSON body is limited to 4 MiB. Source URLs, caller-supplied media keys, arbitrary button JSON, video cards and flows are not accepted. Every card and control is checked before the first upload. An upstream upload failure can leave temporary remote media, but the server does not send a partial carousel. A 201 includes the protocol send ID; it does not confirm rendering or delivery. Do not infer Android, iPhone or Web acceptance from the protobuf or HTTP tests.

@@ -31,7 +31,7 @@ func (s *Server) statusRoutes(r chi.Router) {
 	for _, name := range []string{"send-buttons", "send-list"} {
 		r.Post("/api/{session}/"+name, s.sendInteractive(name))
 	}
-	r.Post("/api/{session}/send-carousel", s.notSupported("carousel_delivery"))
+	r.Post("/api/{session}/send-carousel", s.sendCarousel)
 }
 func (s *Server) sendInteractive(kind string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
