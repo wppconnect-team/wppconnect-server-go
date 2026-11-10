@@ -43,7 +43,7 @@ func migrateOperations(db *sql.DB) error {
 	return err
 }
 func validTarget(target string) bool {
-	return target == "webhook" || target == "nats" || target == "rabbitmq" || target == "redis-streams"
+	return target == "webhook" || target == "nats" || target == "rabbitmq" || target == "redis-streams" || target == "sqs"
 }
 
 type DeliveryStatus struct {
