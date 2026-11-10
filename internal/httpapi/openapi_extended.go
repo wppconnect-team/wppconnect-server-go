@@ -68,6 +68,9 @@ func historyContract() routeContract {
 	return routeContract{tag: "history", success: 200, response: schema{"type": "object"}, description: "Session-owned, observed SQLite messages only, including available history sync. Not a full WhatsApp inbox. Default retention 30 days/100000 messages/256 MiB. limit 1..200 (default 50), cursor is a nonnegative ingestion sequence, newest first. isPartial=true. Keys and raw protocol are never exposed. History remains readable while disconnected."}
 }
 func extendedContract(name string) (routeContract, bool) {
+	if c, ok := catalogContract(name); ok {
+		return c, true
+	}
 	if c, ok := newsletterContract(name); ok {
 		return c, true
 	}
