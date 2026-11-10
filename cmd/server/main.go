@@ -112,6 +112,14 @@ func run(ctx context.Context, cfg config.Config) error {
 		}
 		targets = append(targets, target)
 	}
+	if cfg.N8NWebhookURL != "" {
+		target, e := eventbus.NewN8N(cfg.N8NWebhookURL, cfg.N8NWebhookToken)
+		if e != nil {
+			eventLog.Close()
+			return e
+		}
+		targets = append(targets, target)
+	}
 	options := eventbus.DefaultOptions()
 	options.Workers, options.Attempts, options.Timeout = cfg.WebhookWorkers, cfg.WebhookAttempts, cfg.WebhookTimeout
 	sink, err := eventbus.New(eventLog, targets, options)

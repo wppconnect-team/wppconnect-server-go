@@ -11180,7 +11180,7 @@
     },
     "/api/{session}/events/deliveries": {
       "get": {
-        "description": "Durable session event log; cursor resumes ascending ingestion sequence, limit 1..200. Retention defaults to 7 days/100000 events/128 MiB. Target attempts are independent. Retried/replayed delivery preserves event ID; consumers deduplicate. Saturated logs reject new events with a rejection metric. Requires target=webhook|nats|rabbitmq|redis-streams|sqs; state=failed (default)|pending|delivered. Returns metadata only, including safe failureCode. Cursor is event ingestion sequence for this target; restart from zero to find an older event whose state changed.",
+        "description": "Durable session event log; cursor resumes ascending ingestion sequence, limit 1..200. Retention defaults to 7 days/100000 events/128 MiB. Target attempts are independent. Retried/replayed delivery preserves event ID; consumers deduplicate. Saturated logs reject new events with a rejection metric. Requires target=webhook|nats|rabbitmq|redis-streams|sqs|n8n; state=failed (default)|pending|delivered. Returns metadata only, including safe failureCode. Cursor is event ingestion sequence for this target; restart from zero to find an older event whose state changed.",
         "operationId": "get_events_deliveries",
         "parameters": [
           {
@@ -11223,7 +11223,8 @@
                 "nats",
                 "rabbitmq",
                 "redis-streams",
-                "sqs"
+                "sqs",
+                "n8n"
               ],
               "type": "string"
             }

@@ -9,7 +9,7 @@ curl "$SERVER/api/$SESSION/events/deliveries?target=webhook&state=failed&limit=5
   -H "Authorization: Bearer $TOKEN"
 ```
 
-`target` is required: `webhook`, `nats`, `rabbitmq`, `redis-streams` or `sqs`. `state` is `failed`
+`target` is required: `webhook`, `nats`, `rabbitmq`, `redis-streams`, `sqs` or `n8n`. `state` is `failed`
 (default), `pending` or `delivered`. `cursor` is an event ingestion sequence,
 initially zero; `limit` is 1..200. Keep the target and state unchanged while
 paging. This is a live view, not a frozen snapshot: restart from zero to discover
@@ -109,3 +109,5 @@ The body is the original event JSON. The message attributes `eventId`, `session`
 A confirmed append is a successful SendMessage response with a message ID. It does not mean that a consumer processed the message. The adapter reserves 2 KiB of the SQS 1 MiB message budget for attributes; an oversized body fails without truncation. The durable outbox controls retries, inspection and replay via `target=sqs`; an ambiguous transport failure can result in duplicate delivery. See the [AWS SendMessage contract](https://docs.aws.amazon.com/AWSSimpleQueueService/latest/APIReference/API_SendMessage.html).
 
 CI runs the SDK against an isolated ElasticMQ service. The fixture creates a temporary FIFO queue, checks rejection by a missing queue, publishes the same event twice, consumes it, checks the body/group/identity, and confirms no second message remains. These checks do not verify a production AWS account's IAM or KMS settings.
+
+For a separate authenticated n8n receiver with its own retry state, see the [workflow, setup and test](../examples/n8n/README.md).
