@@ -23,10 +23,31 @@ var sendKeyPattern = regexp.MustCompile(`^[A-Za-z0-9._:-]{1,128}$`)
 
 func idempotentSend(name string) bool {
 	switch name {
+	case "follow-newsletter-invite", "unfollow-newsletter-invite", "newsletter-reaction", "newsletter-mark-viewed", "newsletter-accept-tos", "newsletter-admin-invite":
+		return true
 	case "send-message", "send-reply", "send-image", "send-file", "send-file-base64", "send-voice", "send-voice-base64", "send-audio-base64", "send-video", "send-video-base64", "send-sticker", "send-sticker-gif", "send-contact", "contact-vcard", "send-location", "send-poll-message", "send-status-text", "send-status-media", "send-buttons", "send-list", "send-newsletter-text", "send-reaction":
 		return true
 	}
 	return false
+}
+
+// Results share a namespace only with operations authorized by the same Cloud scope.
+// Existing message keys retain their original hash for compatibility across upgrades.
+func resultRoute(operation string) string {
+	switch operation {
+	case "newsletter-write-result", "follow-newsletter-invite", "unfollow-newsletter-invite", "newsletter-reaction", "newsletter-mark-viewed":
+		return "newsletter-write-result"
+	case "newsletter-admin-result", "newsletter-admin-invite", "newsletter-accept-tos":
+		return "newsletter-admin-result"
+	default:
+		return "send-result"
+	}
+}
+func operationHash(operation, key string) string {
+	if ns := resultRoute(operation); ns != "send-result" {
+		return keyHash(ns + "\x00" + key)
+	}
+	return keyHash(key)
 }
 func keyHash(key string) string { sum := sha256.Sum256([]byte(key)); return hex.EncodeToString(sum[:]) }
 func commandError(w http.ResponseWriter, status int, code, message string) {
@@ -111,7 +132,7 @@ func (s *Server) idempotency(next http.Handler) http.Handler {
 		}
 		r.Body = io.NopCloser(spool)
 		session := cleanSession(chi.URLParam(r, "session"))
-		hash := keyHash(key)
+		hash := operationHash(name, key)
 		record, fresh, err := s.sends.Claim(r.Context(), session, hash, hex.EncodeToString(digest.Sum(nil)))
 		if err != nil {
 			if errors.Is(err, sendledger.ErrConflict) {
@@ -170,7 +191,7 @@ func (s *Server) sendResult(w http.ResponseWriter, r *http.Request) {
 		commandError(w, 503, "SEND_LEDGER_UNAVAILABLE", "durable send ledger unavailable")
 		return
 	}
-	record, err := s.sends.Get(r.Context(), cleanSession(chi.URLParam(r, "session")), keyHash(key))
+	record, err := s.sends.Get(r.Context(), cleanSession(chi.URLParam(r, "session")), operationHash(r.URL.Path[strings.LastIndex(r.URL.Path, "/")+1:], key))
 	if errors.Is(err, sendledger.ErrMissing) {
 		commandError(w, 404, "SEND_RESULT_NOT_FOUND", "send result not found in this session")
 		return

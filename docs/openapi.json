@@ -12607,6 +12607,253 @@
         "x-implemented": true
       }
     },
+    "/api/{session}/follow-newsletter-invite": {
+      "post": {
+        "description": "Resolve an 8..128 character channel invite code or canonical https://whatsapp.com/channel/CODE link through WhatsApp. Follow/unfollow uses only the returned newsletter identity. No arbitrary URLs are fetched. Returned metadata is the lookup snapshot, not proof of a refreshed role.",
+        "operationId": "post_follow_newsletter_invite",
+        "parameters": [
+          {
+            "description": "Unique per session. Repeat the exact method, route, query, Content-Type and body to recover the persisted response without sending again. Changed input returns 409. Pending/ambiguous outcomes are never automatically retried. Completed responses retained at least 7 days. Never reuse a key for a new operation.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "pattern": "^[A-Za-z0-9._:-]{1,128}$",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "session",
+            "required": true,
+            "schema": {
+              "description": "Session name; legacy session:token URL form is accepted but exposes credentials in URLs.",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": false,
+                "properties": {
+                  "invite": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "invite"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "mapper": {
+                      "type": "string"
+                    },
+                    "response": {},
+                    "status": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "status",
+                    "response"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Success with the documented available protocol fields."
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Operation error; inspect status/message and any completed work."
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Operation error; inspect status/message and any completed work."
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Operation error; inspect status/message and any completed work."
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Operation error; inspect status/message and any completed work."
+          },
+          "408": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Operation error; inspect status/message and any completed work."
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Operation error; inspect status/message and any completed work."
+          },
+          "410": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Operation error; inspect status/message and any completed work."
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Operation error; inspect status/message and any completed work."
+          },
+          "415": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Operation error; inspect status/message and any completed work."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Operation error; inspect status/message and any completed work."
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Operation error; inspect status/message and any completed work."
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Operation error; inspect status/message and any completed work."
+          },
+          "501": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Operation error; inspect status/message and any completed work."
+          },
+          "502": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Operation error; inspect status/message and any completed work."
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Operation error; inspect status/message and any completed work."
+          },
+          "504": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Operation error; inspect status/message and any completed work."
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "adminBearer": []
+          },
+          {
+            "adminCookie": []
+          }
+        ],
+        "summary": "follow-newsletter-invite",
+        "tags": [
+          "channels"
+        ],
+        "x-implemented": true
+      }
+    },
     "/api/{session}/get-media-by-message/{messageId}": {
       "get": {
         "description": "Session descriptor cache only; missing/expired media is 404. Does not accept client URLs or decryption keys.",
@@ -21047,6 +21294,763 @@
         "x-implemented": true
       }
     },
+    "/api/{session}/newsletter-accept-tos": {
+      "post": {
+        "description": "Accept a caller-selected newsletter terms notice. noticeId and stage are 1..32 digits; accepted=true must be explicit. Never called automatically by channel creation or other operations.",
+        "operationId": "post_newsletter_accept_tos",
+        "parameters": [
+          {
+            "description": "Unique per session. Repeat the exact method, route, query, Content-Type and body to recover the persisted response without sending again. Changed input returns 409. Pending/ambiguous outcomes are never automatically retried. Completed responses retained at least 7 days. Never reuse a key for a new operation.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "pattern": "^[A-Za-z0-9._:-]{1,128}$",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "session",
+            "required": true,
+            "schema": {
+              "description": "Session name; legacy session:token URL form is accepted but exposes credentials in URLs.",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": false,
+                "properties": {
+                  "accepted": {
+                    "enum": [
+                      true
+                    ],
+                    "type": "boolean"
+                  },
+                  "noticeId": {
+                    "type": "string"
+                  },
+                  "stage": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "noticeId",
+                  "stage",
+                  "accepted"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "mapper": {
+                      "type": "string"
+                    },
+                    "response": {},
+                    "status": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "status",
+                    "response"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Success with the documented available protocol fields."
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Operation error; inspect status/message and any completed work."
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Operation error; inspect status/message and any completed work."
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Operation error; inspect status/message and any completed work."
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Operation error; inspect status/message and any completed work."
+          },
+          "408": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Operation error; inspect status/message and any completed work."
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Operation error; inspect status/message and any completed work."
+          },
+          "410": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Operation error; inspect status/message and any completed work."
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Operation error; inspect status/message and any completed work."
+          },
+          "415": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Operation error; inspect status/message and any completed work."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Operation error; inspect status/message and any completed work."
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Operation error; inspect status/message and any completed work."
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Operation error; inspect status/message and any completed work."
+          },
+          "501": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Operation error; inspect status/message and any completed work."
+          },
+          "502": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Operation error; inspect status/message and any completed work."
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Operation error; inspect status/message and any completed work."
+          },
+          "504": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Operation error; inspect status/message and any completed work."
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "adminBearer": []
+          },
+          {
+            "adminCookie": []
+          }
+        ],
+        "summary": "newsletter-accept-tos",
+        "tags": [
+          "channels"
+        ],
+        "x-implemented": true
+      }
+    },
+    "/api/{session}/newsletter-admin-invite": {
+      "post": {
+        "description": "Send a newsletter administrator invitation message to one phone after verifying the connected account is a newsletter admin/owner. Name comes from upstream metadata. Optional thumbnail is base64 JPEG, at most 64 KiB/512x512, never a fetched URL. Caption up to 2048 characters; expiresInSeconds 60..604800, default 86400. HTTP success means protocol send accepted, not recipient delivery or granting an admin role.",
+        "operationId": "post_newsletter_admin_invite",
+        "parameters": [
+          {
+            "description": "Unique per session. Repeat the exact method, route, query, Content-Type and body to recover the persisted response without sending again. Changed input returns 409. Pending/ambiguous outcomes are never automatically retried. Completed responses retained at least 7 days. Never reuse a key for a new operation.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "pattern": "^[A-Za-z0-9._:-]{1,128}$",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "session",
+            "required": true,
+            "schema": {
+              "description": "Session name; legacy session:token URL form is accepted but exposes credentials in URLs.",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": false,
+                "properties": {
+                  "caption": {
+                    "type": "string"
+                  },
+                  "expiresInSeconds": {
+                    "format": "int64",
+                    "type": "integer"
+                  },
+                  "id": {
+                    "type": "string"
+                  },
+                  "phone": {
+                    "type": "string"
+                  },
+                  "thumbnail": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "id",
+                  "phone"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "mapper": {
+                      "type": "string"
+                    },
+                    "response": {},
+                    "status": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "status",
+                    "response"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Success with the documented available protocol fields."
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Operation error; inspect status/message and any completed work."
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Operation error; inspect status/message and any completed work."
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Operation error; inspect status/message and any completed work."
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Operation error; inspect status/message and any completed work."
+          },
+          "408": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Operation error; inspect status/message and any completed work."
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Operation error; inspect status/message and any completed work."
+          },
+          "410": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Operation error; inspect status/message and any completed work."
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Operation error; inspect status/message and any completed work."
+          },
+          "415": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Operation error; inspect status/message and any completed work."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Operation error; inspect status/message and any completed work."
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Operation error; inspect status/message and any completed work."
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Operation error; inspect status/message and any completed work."
+          },
+          "501": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Operation error; inspect status/message and any completed work."
+          },
+          "502": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Operation error; inspect status/message and any completed work."
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Operation error; inspect status/message and any completed work."
+          },
+          "504": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Operation error; inspect status/message and any completed work."
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "adminBearer": []
+          },
+          {
+            "adminCookie": []
+          }
+        ],
+        "summary": "newsletter-admin-invite",
+        "tags": [
+          "channels"
+        ],
+        "x-implemented": true
+      }
+    },
+    "/api/{session}/newsletter-admin-result": {
+      "get": {
+        "description": "Recover a stored response by Idempotency-Key within this authenticated session and operation namespace. Channel administration, channel writes and ordinary sends have separate result routes. pending_or_unknown and ambiguous outcomes must never be automatically resent with a new key. Complete results are retained for at least 7 days; unresolved reservations do not expire automatically.",
+        "operationId": "get_newsletter_admin_result",
+        "parameters": [
+          {
+            "description": "Unique per session. Repeat the exact method, route, query, Content-Type and body to recover the persisted response without sending again. Changed input returns 409. Pending/ambiguous outcomes are never automatically retried. Completed responses retained at least 7 days. Never reuse a key for a new operation.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": true,
+            "schema": {
+              "pattern": "^[A-Za-z0-9._:-]{1,128}$",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "session",
+            "required": true,
+            "schema": {
+              "description": "Session name; legacy session:token URL form is accepted but exposes credentials in URLs.",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "createdAt": {
+                      "format": "int64",
+                      "type": "integer"
+                    },
+                    "httpStatus": {
+                      "format": "int64",
+                      "type": "integer"
+                    },
+                    "response": {},
+                    "state": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "status",
+                    "state",
+                    "httpStatus",
+                    "createdAt"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Success with the documented available protocol fields."
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Operation error; inspect status/message and any completed work."
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Operation error; inspect status/message and any completed work."
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Operation error; inspect status/message and any completed work."
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Operation error; inspect status/message and any completed work."
+          },
+          "408": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Operation error; inspect status/message and any completed work."
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Operation error; inspect status/message and any completed work."
+          },
+          "410": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Operation error; inspect status/message and any completed work."
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Operation error; inspect status/message and any completed work."
+          },
+          "415": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Operation error; inspect status/message and any completed work."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Operation error; inspect status/message and any completed work."
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Operation error; inspect status/message and any completed work."
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Operation error; inspect status/message and any completed work."
+          },
+          "501": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Operation error; inspect status/message and any completed work."
+          },
+          "502": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Operation error; inspect status/message and any completed work."
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Operation error; inspect status/message and any completed work."
+          },
+          "504": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Operation error; inspect status/message and any completed work."
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "adminBearer": []
+          },
+          {
+            "adminCookie": []
+          }
+        ],
+        "summary": "newsletter-admin-result",
+        "tags": [
+          "messages"
+        ],
+        "x-implemented": true
+      }
+    },
     "/api/{session}/newsletter-info": {
       "post": {
         "description": "Connected-session SDK operations; parent membership/roles enforced by WhatsApp. Communities use group JIDs, newsletters numeric @newsletter JIDs. Newsletter count 1..100, subscribe returns expiration without automatic renewal. Poll choice names must match a retained poll in the same chat; [] withdraws. Limits and partial creation effects are documented in the roadmap guide.",
@@ -21321,6 +22325,813 @@
           }
         ],
         "summary": "newsletter-info",
+        "tags": [
+          "channels"
+        ],
+        "x-implemented": true
+      }
+    },
+    "/api/{session}/newsletter-info-invite": {
+      "post": {
+        "description": "Resolve an 8..128 character channel invite code or canonical https://whatsapp.com/channel/CODE link through WhatsApp. Follow/unfollow uses only the returned newsletter identity. No arbitrary URLs are fetched. Returned metadata is the lookup snapshot, not proof of a refreshed role.",
+        "operationId": "post_newsletter_info_invite",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "session",
+            "required": true,
+            "schema": {
+              "description": "Session name; legacy session:token URL form is accepted but exposes credentials in URLs.",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": false,
+                "properties": {
+                  "invite": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "invite"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "mapper": {
+                      "type": "string"
+                    },
+                    "response": {},
+                    "status": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "status",
+                    "response"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Success with the documented available protocol fields."
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Operation error; inspect status/message and any completed work."
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Operation error; inspect status/message and any completed work."
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Operation error; inspect status/message and any completed work."
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Operation error; inspect status/message and any completed work."
+          },
+          "408": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Operation error; inspect status/message and any completed work."
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Operation error; inspect status/message and any completed work."
+          },
+          "410": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Operation error; inspect status/message and any completed work."
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Operation error; inspect status/message and any completed work."
+          },
+          "415": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Operation error; inspect status/message and any completed work."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Operation error; inspect status/message and any completed work."
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Operation error; inspect status/message and any completed work."
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Operation error; inspect status/message and any completed work."
+          },
+          "501": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Operation error; inspect status/message and any completed work."
+          },
+          "502": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Operation error; inspect status/message and any completed work."
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Operation error; inspect status/message and any completed work."
+          },
+          "504": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Operation error; inspect status/message and any completed work."
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "adminBearer": []
+          },
+          {
+            "adminCookie": []
+          }
+        ],
+        "summary": "newsletter-info-invite",
+        "tags": [
+          "channels"
+        ],
+        "x-implemented": true
+      }
+    },
+    "/api/{session}/newsletter-mark-viewed": {
+      "post": {
+        "description": "Mark 1..100 unique serverIds in 1..2147483647 as viewed in a newsletter, waiting at most 30 seconds for the protocol receipt acknowledgement. This can increment view counters and is distinct from synchronizing read state to other devices. Use Idempotency-Key to avoid repeating an intended operation.",
+        "operationId": "post_newsletter_mark_viewed",
+        "parameters": [
+          {
+            "description": "Unique per session. Repeat the exact method, route, query, Content-Type and body to recover the persisted response without sending again. Changed input returns 409. Pending/ambiguous outcomes are never automatically retried. Completed responses retained at least 7 days. Never reuse a key for a new operation.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "pattern": "^[A-Za-z0-9._:-]{1,128}$",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "session",
+            "required": true,
+            "schema": {
+              "description": "Session name; legacy session:token URL form is accepted but exposes credentials in URLs.",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": false,
+                "properties": {
+                  "id": {
+                    "type": "string"
+                  },
+                  "serverIds": {
+                    "items": {
+                      "maximum": 2147483647,
+                      "minimum": 1,
+                      "type": "integer"
+                    },
+                    "maxItems": 100,
+                    "minItems": 1,
+                    "type": "array",
+                    "uniqueItems": true
+                  }
+                },
+                "required": [
+                  "id",
+                  "serverIds"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "mapper": {
+                      "type": "string"
+                    },
+                    "response": {
+                      "properties": {
+                        "acknowledged": {
+                          "type": "boolean"
+                        },
+                        "count": {
+                          "format": "int64",
+                          "type": "integer"
+                        }
+                      },
+                      "required": [
+                        "acknowledged",
+                        "count"
+                      ],
+                      "type": "object"
+                    },
+                    "status": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "status",
+                    "response"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Success with the documented available protocol fields."
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Operation error; inspect status/message and any completed work."
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Operation error; inspect status/message and any completed work."
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Operation error; inspect status/message and any completed work."
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Operation error; inspect status/message and any completed work."
+          },
+          "408": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Operation error; inspect status/message and any completed work."
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Operation error; inspect status/message and any completed work."
+          },
+          "410": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Operation error; inspect status/message and any completed work."
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Operation error; inspect status/message and any completed work."
+          },
+          "415": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Operation error; inspect status/message and any completed work."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Operation error; inspect status/message and any completed work."
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Operation error; inspect status/message and any completed work."
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Operation error; inspect status/message and any completed work."
+          },
+          "501": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Operation error; inspect status/message and any completed work."
+          },
+          "502": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Operation error; inspect status/message and any completed work."
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Operation error; inspect status/message and any completed work."
+          },
+          "504": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Operation error; inspect status/message and any completed work."
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "adminBearer": []
+          },
+          {
+            "adminCookie": []
+          }
+        ],
+        "summary": "newsletter-mark-viewed",
+        "tags": [
+          "channels"
+        ],
+        "x-implemented": true
+      }
+    },
+    "/api/{session}/newsletter-message-updates": {
+      "post": {
+        "description": "Read bounded reaction/view/forward counts without raw protocol or media keys. count 1..100, default 50; since is Unix seconds in 0..253402300799, after is a server ID in 0..2147483647. Zero omits that filter. The SDK has no before filter; unknown fields are rejected. No complete archive or gap-free cursor guarantee.",
+        "operationId": "post_newsletter_message_updates",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "session",
+            "required": true,
+            "schema": {
+              "description": "Session name; legacy session:token URL form is accepted but exposes credentials in URLs.",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": false,
+                "properties": {
+                  "after": {
+                    "format": "int64",
+                    "type": "integer"
+                  },
+                  "count": {
+                    "default": 50,
+                    "maximum": 100,
+                    "minimum": 1,
+                    "nullable": true,
+                    "type": "integer"
+                  },
+                  "id": {
+                    "type": "string"
+                  },
+                  "since": {
+                    "format": "int64",
+                    "type": "integer"
+                  }
+                },
+                "required": [
+                  "id"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "mapper": {
+                      "type": "string"
+                    },
+                    "response": {
+                      "items": {
+                        "properties": {
+                          "forwards": {
+                            "format": "int64",
+                            "type": "integer"
+                          },
+                          "id": {
+                            "type": "string"
+                          },
+                          "reactions": {
+                            "additionalProperties": {
+                              "format": "int64",
+                              "type": "integer"
+                            },
+                            "type": "object"
+                          },
+                          "reactionsTruncated": {
+                            "type": "boolean"
+                          },
+                          "serverId": {
+                            "format": "int64",
+                            "type": "integer"
+                          },
+                          "timestamp": {
+                            "format": "int64",
+                            "type": "integer"
+                          },
+                          "views": {
+                            "format": "int64",
+                            "type": "integer"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "serverId",
+                          "views",
+                          "forwards",
+                          "reactions",
+                          "reactionsTruncated"
+                        ],
+                        "type": "object"
+                      },
+                      "type": "array"
+                    },
+                    "status": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "status",
+                    "response"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Success with the documented available protocol fields."
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Operation error; inspect status/message and any completed work."
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Operation error; inspect status/message and any completed work."
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Operation error; inspect status/message and any completed work."
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Operation error; inspect status/message and any completed work."
+          },
+          "408": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Operation error; inspect status/message and any completed work."
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Operation error; inspect status/message and any completed work."
+          },
+          "410": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Operation error; inspect status/message and any completed work."
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Operation error; inspect status/message and any completed work."
+          },
+          "415": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Operation error; inspect status/message and any completed work."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Operation error; inspect status/message and any completed work."
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Operation error; inspect status/message and any completed work."
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Operation error; inspect status/message and any completed work."
+          },
+          "501": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Operation error; inspect status/message and any completed work."
+          },
+          "502": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Operation error; inspect status/message and any completed work."
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Operation error; inspect status/message and any completed work."
+          },
+          "504": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Operation error; inspect status/message and any completed work."
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "adminBearer": []
+          },
+          {
+            "adminCookie": []
+          }
+        ],
+        "summary": "newsletter-message-updates",
         "tags": [
           "channels"
         ],
@@ -21603,6 +23414,520 @@
         "summary": "newsletter-messages",
         "tags": [
           "channels"
+        ],
+        "x-implemented": true
+      }
+    },
+    "/api/{session}/newsletter-reaction": {
+      "post": {
+        "description": "Send a reaction to a numeric newsletter JID and serverId 1..2147483647. reaction is required (maximum 64 UTF-8 bytes); an empty string removes it. HTTP 202 means written to the protocol transport, not acknowledged or delivered. The generated reaction id is returned.",
+        "operationId": "post_newsletter_reaction",
+        "parameters": [
+          {
+            "description": "Unique per session. Repeat the exact method, route, query, Content-Type and body to recover the persisted response without sending again. Changed input returns 409. Pending/ambiguous outcomes are never automatically retried. Completed responses retained at least 7 days. Never reuse a key for a new operation.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "pattern": "^[A-Za-z0-9._:-]{1,128}$",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "session",
+            "required": true,
+            "schema": {
+              "description": "Session name; legacy session:token URL form is accepted but exposes credentials in URLs.",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": false,
+                "properties": {
+                  "id": {
+                    "type": "string"
+                  },
+                  "reaction": {
+                    "type": "string"
+                  },
+                  "serverId": {
+                    "maximum": 2147483647,
+                    "minimum": 1,
+                    "type": "integer"
+                  }
+                },
+                "required": [
+                  "id",
+                  "serverId",
+                  "reaction"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "mapper": {
+                      "type": "string"
+                    },
+                    "response": {
+                      "properties": {
+                        "acknowledged": {
+                          "type": "boolean"
+                        },
+                        "id": {
+                          "type": "string"
+                        },
+                        "serverId": {
+                          "format": "int64",
+                          "type": "integer"
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "serverId",
+                        "acknowledged"
+                      ],
+                      "type": "object"
+                    },
+                    "status": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "status",
+                    "response"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Success with the documented available protocol fields."
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Operation error; inspect status/message and any completed work."
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Operation error; inspect status/message and any completed work."
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Operation error; inspect status/message and any completed work."
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Operation error; inspect status/message and any completed work."
+          },
+          "408": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Operation error; inspect status/message and any completed work."
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Operation error; inspect status/message and any completed work."
+          },
+          "410": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Operation error; inspect status/message and any completed work."
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Operation error; inspect status/message and any completed work."
+          },
+          "415": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Operation error; inspect status/message and any completed work."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Operation error; inspect status/message and any completed work."
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Operation error; inspect status/message and any completed work."
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Operation error; inspect status/message and any completed work."
+          },
+          "501": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Operation error; inspect status/message and any completed work."
+          },
+          "502": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Operation error; inspect status/message and any completed work."
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Operation error; inspect status/message and any completed work."
+          },
+          "504": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Operation error; inspect status/message and any completed work."
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "adminBearer": []
+          },
+          {
+            "adminCookie": []
+          }
+        ],
+        "summary": "newsletter-reaction",
+        "tags": [
+          "channels"
+        ],
+        "x-implemented": true
+      }
+    },
+    "/api/{session}/newsletter-write-result": {
+      "get": {
+        "description": "Recover a stored response by Idempotency-Key within this authenticated session and operation namespace. Channel administration, channel writes and ordinary sends have separate result routes. pending_or_unknown and ambiguous outcomes must never be automatically resent with a new key. Complete results are retained for at least 7 days; unresolved reservations do not expire automatically.",
+        "operationId": "get_newsletter_write_result",
+        "parameters": [
+          {
+            "description": "Unique per session. Repeat the exact method, route, query, Content-Type and body to recover the persisted response without sending again. Changed input returns 409. Pending/ambiguous outcomes are never automatically retried. Completed responses retained at least 7 days. Never reuse a key for a new operation.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": true,
+            "schema": {
+              "pattern": "^[A-Za-z0-9._:-]{1,128}$",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "session",
+            "required": true,
+            "schema": {
+              "description": "Session name; legacy session:token URL form is accepted but exposes credentials in URLs.",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "createdAt": {
+                      "format": "int64",
+                      "type": "integer"
+                    },
+                    "httpStatus": {
+                      "format": "int64",
+                      "type": "integer"
+                    },
+                    "response": {},
+                    "state": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "status",
+                    "state",
+                    "httpStatus",
+                    "createdAt"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Success with the documented available protocol fields."
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Operation error; inspect status/message and any completed work."
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Operation error; inspect status/message and any completed work."
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Operation error; inspect status/message and any completed work."
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Operation error; inspect status/message and any completed work."
+          },
+          "408": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Operation error; inspect status/message and any completed work."
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Operation error; inspect status/message and any completed work."
+          },
+          "410": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Operation error; inspect status/message and any completed work."
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Operation error; inspect status/message and any completed work."
+          },
+          "415": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Operation error; inspect status/message and any completed work."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Operation error; inspect status/message and any completed work."
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Operation error; inspect status/message and any completed work."
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Operation error; inspect status/message and any completed work."
+          },
+          "501": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Operation error; inspect status/message and any completed work."
+          },
+          "502": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Operation error; inspect status/message and any completed work."
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Operation error; inspect status/message and any completed work."
+          },
+          "504": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Operation error; inspect status/message and any completed work."
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "adminBearer": []
+          },
+          {
+            "adminCookie": []
+          }
+        ],
+        "summary": "newsletter-write-result",
+        "tags": [
+          "messages"
         ],
         "x-implemented": true
       }
@@ -28643,7 +30968,7 @@
     },
     "/api/{session}/send-result": {
       "get": {
-        "description": "Recover a stored send response by Idempotency-Key within this authenticated session. pending_or_unknown and ambiguous outcomes must never be automatically resent with a new key. Complete results are retained for at least 7 days; unresolved reservations do not expire automatically.",
+        "description": "Recover a stored response by Idempotency-Key within this authenticated session and operation namespace. Channel administration, channel writes and ordinary sends have separate result routes. pending_or_unknown and ambiguous outcomes must never be automatically resent with a new key. Complete results are retained for at least 7 days; unresolved reservations do not expire automatically.",
         "operationId": "get_send_result",
         "parameters": [
           {
@@ -34422,6 +36747,253 @@
           }
         ],
         "summary": "unfollow-newsletter",
+        "tags": [
+          "channels"
+        ],
+        "x-implemented": true
+      }
+    },
+    "/api/{session}/unfollow-newsletter-invite": {
+      "post": {
+        "description": "Resolve an 8..128 character channel invite code or canonical https://whatsapp.com/channel/CODE link through WhatsApp. Follow/unfollow uses only the returned newsletter identity. No arbitrary URLs are fetched. Returned metadata is the lookup snapshot, not proof of a refreshed role.",
+        "operationId": "post_unfollow_newsletter_invite",
+        "parameters": [
+          {
+            "description": "Unique per session. Repeat the exact method, route, query, Content-Type and body to recover the persisted response without sending again. Changed input returns 409. Pending/ambiguous outcomes are never automatically retried. Completed responses retained at least 7 days. Never reuse a key for a new operation.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "pattern": "^[A-Za-z0-9._:-]{1,128}$",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "session",
+            "required": true,
+            "schema": {
+              "description": "Session name; legacy session:token URL form is accepted but exposes credentials in URLs.",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": false,
+                "properties": {
+                  "invite": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "invite"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "mapper": {
+                      "type": "string"
+                    },
+                    "response": {},
+                    "status": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "status",
+                    "response"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Success with the documented available protocol fields."
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Operation error; inspect status/message and any completed work."
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Operation error; inspect status/message and any completed work."
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Operation error; inspect status/message and any completed work."
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Operation error; inspect status/message and any completed work."
+          },
+          "408": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Operation error; inspect status/message and any completed work."
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Operation error; inspect status/message and any completed work."
+          },
+          "410": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Operation error; inspect status/message and any completed work."
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Operation error; inspect status/message and any completed work."
+          },
+          "415": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Operation error; inspect status/message and any completed work."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Operation error; inspect status/message and any completed work."
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Operation error; inspect status/message and any completed work."
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Operation error; inspect status/message and any completed work."
+          },
+          "501": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Operation error; inspect status/message and any completed work."
+          },
+          "502": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Operation error; inspect status/message and any completed work."
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Operation error; inspect status/message and any completed work."
+          },
+          "504": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Operation error; inspect status/message and any completed work."
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "adminBearer": []
+          },
+          {
+            "adminCookie": []
+          }
+        ],
+        "summary": "unfollow-newsletter-invite",
         "tags": [
           "channels"
         ],

@@ -40,6 +40,7 @@ type channelRequest struct {
 }
 
 func (s *Server) channelRoutes(r chi.Router) {
+	s.newsletterRoutes(r)
 	r.Get("/api/{session}/newsletters", s.channelOperation("newsletters"))
 	for _, name := range []string{"create-community", "community-info", "link-community-group", "unlink-community-group", "create-newsletter", "newsletter-info", "follow-newsletter", "unfollow-newsletter", "mute-newsletter", "subscribe-newsletter", "newsletter-messages", "send-newsletter-text", "reject-call", "vote-poll"} {
 		r.Post("/api/{session}/"+name, s.channelOperation(name))
