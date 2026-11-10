@@ -1,6 +1,8 @@
 package auth
 
 import (
+	"crypto/hmac"
+	"crypto/rand"
 	"crypto/sha256"
 	"encoding/binary"
 	"sync"
@@ -19,8 +21,16 @@ type verificationSlot struct {
 	expires time.Time
 }
 
+// cacheKey is never persisted. The same credentials produce unrelated cache keys
+// across process restarts; bcrypt remains the authoritative verifier.
+var cacheKey = sync.OnceValue(func() []byte {
+	key := make([]byte, 32)
+	rand.Read(key)
+	return key
+})
+
 func credentialDigest(session, secret, token string) [32]byte {
-	h := sha256.New()
+	h := hmac.New(sha256.New, cacheKey())
 	var size [8]byte
 	for _, v := range []string{session, secret, token} {
 		binary.BigEndian.PutUint64(size[:], uint64(len(v)))
