@@ -2,8 +2,8 @@
 package notifications
 
 import (
-	"go.mau.fi/whatsmeow/types"
-	"go.mau.fi/whatsmeow/types/events"
+	"github.com/polymorfa/hypermeow/types"
+	"github.com/polymorfa/hypermeow/types/events"
 )
 
 func call(kind string, v types.BasicCallMeta) (string, map[string]any) {

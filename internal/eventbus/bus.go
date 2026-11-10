@@ -14,7 +14,7 @@ import (
 	"github.com/wppconnect-team/wppconnect-server-go/internal/media"
 	"github.com/wppconnect-team/wppconnect-server-go/internal/notifications"
 	"github.com/wppconnect-team/wppconnect-server-go/internal/session"
-	"go.mau.fi/whatsmeow/types/events"
+	"github.com/polymorfa/hypermeow/types/events"
 )
 
 type Target interface {

@@ -109,3 +109,5 @@ Copyright 2026 WPPConnect Team and contributors.
 O documento jurídico original e os avisos de autoria existentes são preservados. Componentes de terceiros mantêm seus próprios termos.
 
 As dependências mantêm seus próprios termos. Consulte [NOTICE](NOTICE) e as [licenças de terceiros](third_party/licenses.txt), incluindo o fork whatsmeow MPL-2.0 registrado em `go.mod`. Conforme NOTICE, nenhum fonte do Evolution Go está incluído.
+
+[Integracao HyperMeow e migracao de banco](docs/hypermeow.md)

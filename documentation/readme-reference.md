@@ -46,7 +46,7 @@ Este documento preserva o `README.md` anterior com detalhes técnicos, agradecim
 
 WPPConnect Server Go provides WhatsApp sessions, messaging, groups, contacts,
 chat metadata and presence through an HTTP API. It uses the
-[WPPConnect whatsmeow fork](https://github.com/wppconnect-team/whatsmeow) to
+[WPPConnect HyperMeow](https://github.com/wppconnect-team/hypermeow) to
 connect directly to WhatsApp, without running Chromium or Puppeteer.
 
 The project implements selected routes and payload conventions from
@@ -494,13 +494,13 @@ docs/            API export, detailed guides, compatibility and roadmap
 | --- | --- |
 | Runtime | Go 1.26.10+ |
 | HTTP routing | chi |
-| WhatsApp protocol | Pinned WPPConnect whatsmeow fork |
+| WhatsApp protocol | Pinned WPPConnect HyperMeow SDK |
 | Persistence | SQLite through modernc.org/sqlite, without CGO for normal builds |
 | Authentication | bcrypt through golang.org/x/crypto |
 | API documentation | OpenAPI 3.0.3; kin-openapi validation in tests |
 | Deployment | Docker, Compose and Portainer; Linux amd64/arm64 |
 
-The code imports `go.mau.fi/whatsmeow`; the versioned `replace` directive in
+The code imports `github.com/polymorfa/hypermeow`; the versioned `replace` directive in
 [`go.mod`](../go.mod) selects the WPPConnect fork. Dependency upgrades should update
 that pinned revision deliberately and rerun protocol/contract tests.
 
@@ -592,3 +592,5 @@ Licensed under [Apache-2.0](../LICENSE). See [NOTICE](../NOTICE) and
 [third-party licenses](../third_party/licenses.txt), also shipped in the container.
 Dependency source/version references are retained in `go.mod` and the notices;
 whatsmeow remains under its upstream MPL-2.0 terms.
+
+See [HyperMeow integration and database migration](../docs/hypermeow.md) before updating an existing session database.

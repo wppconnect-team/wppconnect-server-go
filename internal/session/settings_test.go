@@ -2,7 +2,7 @@ package session
 
 import (
 	"context"
-	"go.mau.fi/whatsmeow"
+	"github.com/polymorfa/hypermeow"
 	"testing"
 	"time"
 )

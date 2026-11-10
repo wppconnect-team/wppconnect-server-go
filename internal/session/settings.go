@@ -9,7 +9,7 @@ import (
 	"strings"
 	"time"
 
-	"go.mau.fi/whatsmeow"
+	"github.com/polymorfa/hypermeow"
 )
 
 type Settings struct {

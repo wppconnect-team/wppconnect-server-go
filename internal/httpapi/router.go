@@ -26,7 +26,7 @@ import (
 	"github.com/wppconnect-team/wppconnect-server-go/internal/media"
 	"github.com/wppconnect-team/wppconnect-server-go/internal/session"
 	"github.com/wppconnect-team/wppconnect-server-go/internal/vault"
-	"go.mau.fi/whatsmeow/types"
+	"github.com/polymorfa/hypermeow/types"
 )
 
 // Server wires the routes to the session manager.

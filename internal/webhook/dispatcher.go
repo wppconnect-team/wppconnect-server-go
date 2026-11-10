@@ -26,7 +26,7 @@ import (
 	"github.com/wppconnect-team/wppconnect-server-go/internal/media"
 
 	"github.com/wppconnect-team/wppconnect-server-go/internal/session"
-	"go.mau.fi/whatsmeow/types/events"
+	"github.com/polymorfa/hypermeow/types/events"
 )
 
 // Dispatcher posts events to a webhook URL. It satisfies session.EventSink.

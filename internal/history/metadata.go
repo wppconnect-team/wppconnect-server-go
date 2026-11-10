@@ -10,7 +10,7 @@ import (
 	"time"
 	"unicode/utf8"
 
-	"go.mau.fi/whatsmeow/types/events"
+	"github.com/polymorfa/hypermeow/types/events"
 )
 
 type Label struct {

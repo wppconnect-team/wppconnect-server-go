@@ -11,8 +11,8 @@ import (
 	"time"
 	"unicode/utf8"
 
-	"go.mau.fi/whatsmeow"
-	"go.mau.fi/whatsmeow/types"
+	"github.com/polymorfa/hypermeow"
+	"github.com/polymorfa/hypermeow/types"
 )
 
 const MaxBodyBytes = 64 << 10

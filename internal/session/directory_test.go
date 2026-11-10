@@ -5,8 +5,8 @@ import (
 	"testing"
 
 	"github.com/wppconnect-team/wppconnect-server-go/internal/directory"
-	"go.mau.fi/whatsmeow/types"
-	"go.mau.fi/whatsmeow/types/events"
+	"github.com/polymorfa/hypermeow/types"
+	"github.com/polymorfa/hypermeow/types/events"
 )
 
 type directorySink struct {
