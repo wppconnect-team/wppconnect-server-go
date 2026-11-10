@@ -1,0 +1,85 @@
+{
+  "id": "WppEventsFixture1",
+  "name": "WPPConnect event receiver",
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "saveDataErrorExecution": "none",
+    "saveDataSuccessExecution": "none",
+    "saveManualExecutions": false
+  },
+  "nodes": [
+    {
+      "id": "76fd6ea5-1b87-4a42-83b5-2ded1296d2ce",
+      "webhookId": "8145fcc0-9e89-4c39-9b7c-5b295156aa8a",
+      "name": "Receive event",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "wppconnect-events",
+        "authentication": "headerAuth",
+        "responseMode": "lastNode",
+        "options": {}
+      },
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "WppHeaderFixture1",
+          "name": "WPPConnect workflow token"
+        }
+      }
+    },
+    {
+      "id": "16248b08-cd75-4e9e-b903-e4365c35b03c",
+      "name": "Pick event fields",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        240,
+        0
+      ],
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "eventId",
+              "name": "eventId",
+              "type": "string",
+              "value": "={{ $json.headers['x-wpp-event-id'] }}"
+            },
+            {
+              "id": "event",
+              "name": "event",
+              "type": "string",
+              "value": "={{ $json.body.event }}"
+            },
+            {
+              "id": "session",
+              "name": "session",
+              "type": "string",
+              "value": "={{ $json.body.session }}"
+            }
+          ]
+        },
+        "options": {}
+      }
+    }
+  ],
+  "connections": {
+    "Receive event": {
+      "main": [
+        [
+          {
+            "node": "Pick event fields",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

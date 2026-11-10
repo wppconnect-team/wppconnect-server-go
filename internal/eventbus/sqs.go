@@ -37,6 +37,7 @@ func NewSQS(ctx context.Context, queue, region string) (*SQS, error) {
 func (t *SQS) Name() string { return "sqs" }
 func (t *SQS) Close() error { return nil }
 func (t *SQS) Deliver(ctx context.Context, e Event) error {
+	e = externalIntegrationEvent(e)
 	if err := ctx.Err(); err != nil {
 		return err
 	}

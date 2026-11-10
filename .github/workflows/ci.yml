@@ -62,6 +62,19 @@ jobs:
         run: go test -race ./internal/eventbus ./internal/vault -count=1 -timeout 120s
       - if: always()
         run: docker compose -p wppgo-tests -f deploy/integration-test.yml down -v
+  n8n:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.ref || github.ref }}
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+          cache: true
+      - name: Import and run authenticated n8n workflow
+        run: bash scripts/test-n8n.sh
   image:
     runs-on: ubuntu-latest
     strategy:

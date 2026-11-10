@@ -364,7 +364,7 @@ func buildOpenAPI() []byte {
 			}
 		}
 		if name == "events/deliveries" {
-			params = append(params, schema{"name": "target", "in": "query", "required": true, "schema": schema{"type": "string", "enum": []string{"webhook", "nats", "rabbitmq", "redis-streams", "sqs"}}}, schema{"name": "state", "in": "query", "schema": schema{"type": "string", "enum": []string{"failed", "pending", "delivered"}, "default": "failed"}})
+			params = append(params, schema{"name": "target", "in": "query", "required": true, "schema": schema{"type": "string", "enum": []string{"webhook", "nats", "rabbitmq", "redis-streams", "sqs", "n8n"}}}, schema{"name": "state", "in": "query", "schema": schema{"type": "string", "enum": []string{"failed", "pending", "delivered"}, "default": "failed"}})
 		}
 		if strings.HasPrefix(name, "admin/") && method != http.MethodGet {
 			params = append(params, schema{"name": "X-CSRF-Token", "in": "header", "schema": str(), "description": "Required for cookie-authenticated writes. Returned by login/auth; Bearer-authenticated calls do not require CSRF."})

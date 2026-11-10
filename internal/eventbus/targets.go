@@ -25,6 +25,7 @@ type HTTP struct {
 	Client *http.Client
 	// SigningSecret is configured at startup, never persisted with an event.
 	SigningSecret string
+	workflowToken string
 }
 
 func NewHTTP(target string) (*HTTP, error) {
@@ -34,14 +35,46 @@ func NewHTTP(target string) (*HTTP, error) {
 	}
 	return &HTTP{URL: target, Client: &http.Client{CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}}, nil
 }
-func (h *HTTP) Name() string { return "webhook" }
+func (h *HTTP) Name() string {
+	if h.workflowToken != "" {
+		return "n8n"
+	}
+	return "webhook"
+}
+
+// NewN8N creates an operator-selected production webhook with header authentication.
+// Outside loopback, TLS is required. Never follow redirects carrying this token.
+func NewN8N(raw, token string) (*HTTP, error) {
+	u, e := url.Parse(raw)
+	if e != nil || u.User != nil || u.Hostname() == "" || u.RawQuery != "" || u.ForceQuery || u.Fragment != "" || !strings.HasPrefix(u.Path, "/webhook/") || len(strings.TrimPrefix(u.Path, "/webhook/")) == 0 {
+		return nil, errors.New("invalid n8n production webhook")
+	}
+	if u.Scheme != "https" && !(u.Scheme == "http" && net.ParseIP(u.Hostname()).IsLoopback()) {
+		return nil, errors.New("n8n webhook requires HTTPS outside loopback")
+	}
+	if len(token) < 32 || len(token) > 256 || strings.IndexFunc(token, func(r rune) bool { return r < 33 || r > 126 }) >= 0 {
+		return nil, errors.New("invalid n8n header credential")
+	}
+	h, e := NewHTTP(raw)
+	if e != nil {
+		return nil, e
+	}
+	h.workflowToken = token
+	return h, nil
+}
 func (h *HTTP) Close() error { h.Client.CloseIdleConnections(); return nil }
 func (h *HTTP) Deliver(ctx context.Context, e Event) error {
+	if h.workflowToken != "" {
+		e = externalIntegrationEvent(e)
+	}
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, h.URL, bytes.NewReader(e.Data))
 	if err != nil {
 		return err
 	}
 	req.Header.Set("Content-Type", "application/json")
+	if h.workflowToken != "" {
+		req.Header.Set("X-WPP-Workflow-Token", h.workflowToken)
+	}
 	req.Header.Set("X-WPP-Event-ID", e.ID)
 	req.Header.Set("X-WPP-Attempt", strconv.Itoa(e.Attempt))
 	if h.SigningSecret != "" {
