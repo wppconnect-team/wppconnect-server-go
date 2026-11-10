@@ -22,6 +22,9 @@ import (
 var sendKeyPattern = regexp.MustCompile(`^[A-Za-z0-9._:-]{1,128}$`)
 
 func idempotentSend(name string) bool {
+	if catalogMutation(name) {
+		return true
+	}
 	switch name {
 	case "follow-newsletter-invite", "unfollow-newsletter-invite", "newsletter-reaction", "newsletter-mark-viewed", "newsletter-accept-tos", "newsletter-admin-invite":
 		return true
@@ -34,6 +37,9 @@ func idempotentSend(name string) bool {
 // Results share a namespace only with operations authorized by the same Cloud scope.
 // Existing message keys retain their original hash for compatibility across upgrades.
 func resultRoute(operation string) string {
+	if catalogMutation(operation) || operation == catalogWriteResult {
+		return catalogWriteResult
+	}
 	switch operation {
 	case "newsletter-write-result", "follow-newsletter-invite", "unfollow-newsletter-invite", "newsletter-reaction", "newsletter-mark-viewed":
 		return "newsletter-write-result"
