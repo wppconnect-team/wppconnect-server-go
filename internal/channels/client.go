@@ -31,6 +31,19 @@ type Client interface {
 }
 type SDK struct{ *whatsmeow.Client }
 
+// NewsletterOperations keeps optional channel operations separate from the
+// community and poll interface used by existing integrations.
+type NewsletterOperations interface {
+	GetNewsletterInfoWithInvite(context.Context, string) (*types.NewsletterMetadata, error)
+	NewsletterSendReaction(context.Context, types.JID, types.MessageServerID, string, types.MessageID) error
+	NewsletterMarkViewed(context.Context, types.JID, []types.MessageServerID) error
+	GetNewsletterMessageUpdates(context.Context, types.JID, *whatsmeow.GetNewsletterUpdatesParams) ([]*types.NewsletterMessage, error)
+	AcceptTOSNotice(context.Context, string, string) error
+	GenerateMessageID() types.MessageID
+}
+
+var _ NewsletterOperations = SDK{}
+
 func (s SDK) Self() types.JID {
 	if s.Store == nil || s.Store.ID == nil {
 		return types.EmptyJID

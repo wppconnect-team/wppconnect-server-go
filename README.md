@@ -23,6 +23,8 @@ for operating the durable event log.
 For duplicate suppression and response recovery on sends, see
 [persistent send idempotency](docs/send-idempotency.md).
 
+[Newsletter API: invites, reactions, view receipts and update feeds (Portuguese)](docs/newsletters.pt-BR.md).
+
 [![License: Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-blue)](./LICENSE) [![CI](https://github.com/wppconnect-team/wppconnect-server-go/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/wppconnect-team/wppconnect-server-go/actions/workflows/ci.yml) [![Documentation](https://img.shields.io/badge/docs-WPPConnect-blue)](https://wppconnect.io/) [![Open Collective](https://img.shields.io/badge/Open%20Collective-WPPConnect-blue)](https://opencollective.com/wppconnect)
 
 ## Overview
