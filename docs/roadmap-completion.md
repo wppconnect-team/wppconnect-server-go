@@ -195,6 +195,8 @@ and retries failed deletion; metadata is forgotten only after S3 deletion succee
 Keep history DB metadata when migrating the bucket. Backup/restore all databases
 and objects together; there is no automatic migration from external products.
 
+When an explicit archive upload has an uncertain outcome, repeat the same archive request while the original message descriptor and bytes remain available. The vault looks up the session's active reservation and reads its original object. The bytes, size and MIME must match. A successful recovery confirms the same object generation and measures the configured retention from the original attempt. A missing or mismatched object stays unavailable until cleanup. Repeating an already confirmed archive also verifies the object and preserves its expiry. This applies to explicit archive requests.
+
 ## Pairing and settings
 
 ```bash

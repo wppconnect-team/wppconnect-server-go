@@ -56,12 +56,39 @@ func (s *Store) FinishMedia(ctx context.Context, m StoredMedia) error {
 	return err
 }
 func (s *Store) Media(ctx context.Context, chat, id string) (StoredMedia, error) {
+	return s.activeMedia(ctx, chat, id, false)
+}
+
+// ActiveMediaReservation includes pending generations for upload reconciliation.
+func (s *Store) ActiveMediaReservation(ctx context.Context, chat, id string) (StoredMedia, error) {
+	return s.activeMedia(ctx, chat, id, true)
+}
+
+func (s *Store) activeMedia(ctx context.Context, chat, id string, includePending bool) (StoredMedia, error) {
 	var m StoredMedia
-	err := s.db.QueryRowContext(ctx, "SELECT chat,id,object,mime,size,hash,expires,ready FROM history_media WHERE chat=? AND id=? AND ready=1 AND expires>?", chat, id, time.Now().UnixMilli()).Scan(&m.Chat, &m.ID, &m.Key, &m.MIME, &m.Size, &m.Hash, &m.Expires, &m.Ready)
+	err := s.db.QueryRowContext(ctx, "SELECT chat,id,object,mime,size,hash,expires,ready FROM history_media WHERE chat=? AND id=? AND (ready=1 OR ?) AND expires>?", chat, id, includePending, time.Now().UnixMilli()).Scan(&m.Chat, &m.ID, &m.Key, &m.MIME, &m.Size, &m.Hash, &m.Expires, &m.Ready)
 	if errors.Is(err, sql.ErrNoRows) {
 		err = ErrNotFound
 	}
 	return m, err
+}
+
+// ConfirmMedia transitions only the original live reservation. A concurrent
+// confirmation preserves the first retention deadline.
+func (s *Store) ConfirmMedia(ctx context.Context, m StoredMedia, expires int64) (StoredMedia, error) {
+	now := time.Now().UnixMilli()
+	if expires <= now {
+		return StoredMedia{}, ErrNotFound
+	}
+	_, err := s.db.ExecContext(ctx, "UPDATE history_media SET ready=1,expires=? WHERE chat=? AND id=? AND object=? AND ready=0 AND expires>?", expires, m.Chat, m.ID, m.Key, now)
+	if err != nil {
+		return StoredMedia{}, err
+	}
+	current, err := s.Media(ctx, m.Chat, m.ID)
+	if err == nil && current.Key != m.Key {
+		return StoredMedia{}, ErrNotFound
+	}
+	return current, err
 }
 func (s *Store) ExpiredMedia(ctx context.Context, now int64) ([]StoredMedia, error) {
 	rows, err := s.db.QueryContext(ctx, "SELECT chat,id,object,mime,size,hash,expires,ready FROM history_media WHERE expires<=? ORDER BY expires LIMIT 100", now)
