@@ -12,12 +12,16 @@ func TestPersistentTextOnlyForOrdinaryEnvelope(t *testing.T) {
 	extended := func(ctx *waE2E.ContextInfo) *waE2E.Message {
 		return &waE2E.Message{ExtendedTextMessage: &waE2E.ExtendedTextMessage{Text: proto.String("text"), ContextInfo: ctx}}
 	}
+	viewOnceText := extended(nil)
+	viewOnceText.ExtendedTextMessage.ViewOnce = proto.Bool(true)
 	vectors := []struct {
 		msg  *events.Message
 		want bool
 	}{
 		{&events.Message{Message: plain}, true},
 		{&events.Message{Message: extended(nil)}, true},
+		{&events.Message{Message: viewOnceText}, false},
+		{&events.Message{RawMessage: viewOnceText, Message: plain}, false},
 		{&events.Message{Message: extended(&waE2E.ContextInfo{Expiration: proto.Uint32(120)})}, false},
 		{&events.Message{Message: plain, IsEphemeral: true}, false},
 		{&events.Message{Message: plain, IsViewOnce: true}, false},

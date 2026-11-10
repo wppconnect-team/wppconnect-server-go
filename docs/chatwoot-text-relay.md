@@ -40,6 +40,8 @@ Para habilitar o sentido WhatsApp para Chatwoot, acrescente estas variáveis ao 
 | `WPP_WEBHOOK_SECRET` | Mesmo segredo de pelo menos 32 bytes usado na assinatura do webhook da sessão Go. |
 | `WPP_PEER_LID` | Opcional. Identificador WhatsApp alternativo confirmado para o mesmo contato, no formato numérico seguido de `@lid`. |
 
+A elegibilidade `persistentText` pertence ao evento observado ao vivo. O servidor examina também o indicador de visualização única dentro de texto estendido. Consultas ao histórico podem conter envelopes já normalizados e omitem essa indicação, inclusive ao ler bancos de versões anteriores. O adaptador usa o webhook assinado para decidir se encaminha o texto.
+
 O adaptador verifica a assinatura WPP, a sessão, o remetente e o tipo da mensagem. Encaminha texto direto recebido cujo envelope indica texto comum. Grupos, texto temporário, anexos, ecos, eventos antigos sem a marca de elegibilidade e outras conversas são ignorados. Antes de gravar, consulta a conversa pela API do Chatwoot e confere conta, inbox de API e contato atuais. Use uma inbox dedicada ao vínculo.
 
 A coluna `source_id` da mensagem no Chatwoot recebe um identificador estável derivado da sessão e do ID de mensagem WhatsApp. Depois de uma confirmação perdida, o adaptador consulta a página mais recente de mensagens. Se a mensagem saiu dessa página, a operação permanece pendente para conferência. Uma nova entrega pode completar o recibo quando a mensagem correspondente estiver visível. Preserve o banco local durante a recuperação.
