@@ -15,4 +15,4 @@ for i in {1..60}; do
 done
 docker exec "$app" bundle exec rails runner /tmp/seed-relay.rb
 export CHATWOOT_INBOX_FIXTURE="$workspace/state.json"
-go test ./cmd/chatwoot-text-relay -count=1 -run '^TestChatwootAPIInbox$' -v
+go test ./cmd/chatwoot-text-relay -count=1 -run '^TestChatwootAPI(Inbox|Provision)$' -v

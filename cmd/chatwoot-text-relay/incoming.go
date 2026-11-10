@@ -22,15 +22,19 @@ type incomingHandler struct {
 	conversationURL, token, secret, lid string
 }
 
+func validOrigin(origin string) bool {
+	u, err := url.Parse(origin)
+	return err == nil && u.Scheme == "https" && u.Hostname() != "" && u.User == nil && !u.ForceQuery && u.RawQuery == "" && u.Fragment == "" && u.Opaque == "" && (u.Path == "" || u.Path == "/")
+}
+
 func configureIncoming(a *relay, origin, token, secret, lid string) (*incomingHandler, error) {
 	if origin == "" && token == "" && secret == "" && lid == "" {
 		return nil, nil
 	}
-	u, err := url.Parse(origin)
-	if err != nil || u.Scheme != "https" || u.Hostname() == "" || u.User != nil || u.RawQuery != "" || u.Fragment != "" || u.Opaque != "" || (u.Path != "" && u.Path != "/") || token == "" || len(secret) < 32 || (lid != "" && !lidFormat.MatchString(lid)) {
+	if !validOrigin(origin) || token == "" || len(secret) < 32 || (lid != "" && !lidFormat.MatchString(lid)) {
 		return nil, errors.New("invalid incoming webhook configuration")
 	}
-	endpoint := fmt.Sprintf("https://%s/api/v1/accounts/%d/conversations/%d", u.Host, a.bound.Account, a.bound.Conversation)
+	endpoint := fmt.Sprintf("%s/api/v1/accounts/%d/conversations/%d", strings.TrimSuffix(origin, "/"), a.bound.Account, a.bound.Conversation)
 	return newIncoming(a, endpoint, token, secret, lid)
 }
 func newIncoming(a *relay, endpoint, token, secret, lid string) (*incomingHandler, error) {
@@ -130,17 +134,20 @@ func (h *incomingHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 }
 func (h *incomingHandler) request(ctx context.Context, method, suffix string, payload []byte, v any) bool {
-	req, err := http.NewRequestWithContext(ctx, method, h.conversationURL+suffix, bytes.NewReader(payload))
+	return chatwootRequest(ctx, h.relay.client, h.token, method, h.conversationURL+suffix, payload, v)
+}
+func chatwootRequest(ctx context.Context, client *http.Client, token, method, endpoint string, payload []byte, v any) bool {
+	req, err := http.NewRequestWithContext(ctx, method, endpoint, bytes.NewReader(payload))
 	if err != nil {
 		return false
 	}
 	req.GetBody = nil
-	req.Header.Set("api_access_token", h.token)
+	req.Header.Set("api_access_token", token)
 	req.Header.Set("Accept", "application/json")
 	if len(payload) > 0 {
 		req.Header.Set("Content-Type", "application/json")
 	}
-	resp, err := h.relay.client.Do(req)
+	resp, err := client.Do(req)
 	if err != nil {
 		return false
 	}

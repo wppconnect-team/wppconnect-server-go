@@ -257,7 +257,16 @@ func main() {
 		}
 		return n
 	}
-	b := binding{positive("CHATWOOT_ACCOUNT_ID"), positive("CHATWOOT_INBOX_ID"), positive("CHATWOOT_CONVERSATION_ID"), positive("CHATWOOT_CONTACT_ID"), os.Getenv("WPP_SESSION_ID"), os.Getenv("WPP_PHONE")}
+	b := binding{Account: positive("CHATWOOT_ACCOUNT_ID"), Inbox: positive("CHATWOOT_INBOX_ID"), Session: os.Getenv("WPP_SESSION_ID"), Phone: os.Getenv("WPP_PHONE")}
+	automatic := os.Getenv("CHATWOOT_PROVISION") == "true"
+	if automatic {
+		if os.Getenv("CHATWOOT_CONTACT_ID") != "" || os.Getenv("CHATWOOT_CONVERSATION_ID") != "" {
+			log.Fatal("automatic provisioning conflicts with manual IDs")
+		}
+	} else {
+		b.Contact = positive("CHATWOOT_CONTACT_ID")
+		b.Conversation = positive("CHATWOOT_CONVERSATION_ID")
+	}
 	secret, token := os.Getenv("CHATWOOT_WEBHOOK_SECRET"), os.Getenv("WPP_CLOUD_API_KEY")
 	dir := os.Getenv("RELAY_STATE_DIR")
 	if !regexp.MustCompile("^[A-Za-z0-9_-]{1,100}$").MatchString(b.Session) || !regexp.MustCompile("^[1-9][0-9]{6,14}$").MatchString(b.Phone) || !validSigningSecret(secret) || token == "" || !filepath.IsAbs(dir) {
@@ -266,12 +275,27 @@ func main() {
 	if e := os.MkdirAll(dir, 0700); e != nil {
 		log.Fatal("state directory unavailable")
 	}
+	client := &http.Client{Timeout: 65 * time.Second, CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}
+	if automatic {
+		origin, apiToken := os.Getenv("CHATWOOT_BASE_URL"), os.Getenv("CHATWOOT_API_TOKEN")
+		lid := os.Getenv("WPP_PEER_LID")
+		if !validOrigin(origin) || apiToken == "" || len(os.Getenv("WPP_WEBHOOK_SECRET")) < 32 || (lid != "" && !lidFormat.MatchString(lid)) {
+			log.Fatal("incomplete automatic route configuration")
+		}
+		ctx, cancel := context.WithTimeout(context.Background(), 90*time.Second)
+		resolved, err := resolveRoute(ctx, dir, strings.TrimSuffix(origin, "/"), apiToken, client, b)
+		cancel()
+		if err != nil {
+			log.Fatal(err)
+		}
+		b = resolved
+	}
 	db, e := state(filepath.Join(dir, "receipts.db"), b)
 	if e != nil {
 		log.Fatal("state unavailable or bound to another route")
 	}
 	defer db.Close()
-	a := &relay{b, secret, token, "https://cloud.wppconnect.io/api/v1/sessions/" + b.Session + "/send-text", db, &http.Client{Timeout: 65 * time.Second, CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}, time.Now, make(chan struct{}, 8)}
+	a := &relay{b, secret, token, "https://cloud.wppconnect.io/api/v1/sessions/" + b.Session + "/send-text", db, client, time.Now, make(chan struct{}, 8)}
 	mux := http.NewServeMux()
 	mux.Handle("/chatwoot", a)
 	incoming, err := configureIncoming(a, os.Getenv("CHATWOOT_BASE_URL"), os.Getenv("CHATWOOT_API_TOKEN"), os.Getenv("WPP_WEBHOOK_SECRET"), os.Getenv("WPP_PEER_LID"))
