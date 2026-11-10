@@ -65,6 +65,10 @@ CREATE TRIGGER IF NOT EXISTS bus_delete AFTER DELETE ON bus_events BEGIN UPDATE 
 		db.Close()
 		return nil, err
 	}
+	if err = migrateOperations(db); err != nil {
+		db.Close()
+		return nil, err
+	}
 	return &Log{db: db, Limit: 100000, MaxBytes: 128 << 20, Retention: 7 * 24 * time.Hour}, nil
 }
 func (s *Log) Close() error { return s.db.Close() }
@@ -178,8 +182,8 @@ func (s *Log) claim(ctx context.Context, targets []string, leaseTime time.Durati
 	}
 	return d, sql.ErrNoRows
 }
-func (s *Log) finish(ctx context.Context, d delivery, state string, next time.Time) error {
-	_, err := s.db.ExecContext(ctx, `UPDATE bus_deliveries SET state=?,attempt=attempt+1,next=?,lease='',lease_until=0 WHERE event=? AND target=? AND lease=?`, state, next.UnixMilli(), d.Event.ID, d.Target, d.Lease)
+func (s *Log) finish(ctx context.Context, d delivery, state string, next time.Time, failure string) error {
+	_, err := s.db.ExecContext(ctx, `UPDATE bus_deliveries SET state=?,attempt=attempt+1,next=?,lease='',lease_until=0,failure_code=? WHERE event=? AND target=? AND lease=?`, state, next.UnixMilli(), failure, d.Event.ID, d.Target, d.Lease)
 	return err
 }
 func (s *Log) Replay(ctx context.Context, session, id string, targets []string) error {
@@ -204,6 +208,9 @@ func (s *Log) Replay(ctx context.Context, session, id string, targets []string) 
 		}
 		_, err = tx.ExecContext(ctx, `INSERT INTO bus_deliveries(event,target) VALUES(?,?) ON CONFLICT(event,target) DO UPDATE SET attempt=0,next=0,state='pending',lease='',lease_until=0`, id, target)
 		if err != nil {
+			return err
+		}
+		if err = auditReplay(ctx, tx, id, target, "legacy-api", "all-states"); err != nil {
 			return err
 		}
 	}

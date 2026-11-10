@@ -294,6 +294,16 @@ func (s *Server) metrics(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 		fmt.Fprintf(w, "wppconnect_rejected_events_total %d\n", s.events.Rejected())
+		health, err := s.events.Log.Health(ctx)
+		if err == nil {
+			fmt.Fprintf(w, "wppconnect_event_log_events %d\nwppconnect_event_log_bytes %d\nwppconnect_event_log_max_events %d\nwppconnect_event_log_max_bytes %d\n", health.Events, health.Bytes, s.events.Log.Limit, s.events.Log.MaxBytes)
+			for _, queue := range health.Queues {
+				fmt.Fprintf(w, "wppconnect_target_deliveries{target=%q,state=%q} %d\n", queue.Target, queue.State, queue.Count)
+				if queue.State == "pending" {
+					fmt.Fprintf(w, "wppconnect_target_oldest_pending_seconds{target=%q} %.3f\n", queue.Target, queue.OldestAgeSeconds)
+				}
+			}
+		}
 	}
 }
 func (s *Server) capabilities(w http.ResponseWriter, r *http.Request) {

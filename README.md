@@ -17,6 +17,9 @@ A project in the WPPConnect ecosystem, maintained by WPPConnect Team.
 
 [Getting started](#getting-started) | [Documentation](#documentation) | [Contributing](#contributing) | [Support WPPConnect](#support-the-project)
 
+See [delivery failure recovery, audit and metrics](docs/event-delivery-operations.md)
+for operating the durable event log.
+
 For duplicate suppression and response recovery on sends, see
 [persistent send idempotency](docs/send-idempotency.md).
 

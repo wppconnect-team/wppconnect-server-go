@@ -9,12 +9,12 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/polymorfa/hypermeow/types/events"
 	"github.com/wppconnect-team/wppconnect-server-go/internal/directory"
 	"github.com/wppconnect-team/wppconnect-server-go/internal/groups"
 	"github.com/wppconnect-team/wppconnect-server-go/internal/media"
 	"github.com/wppconnect-team/wppconnect-server-go/internal/notifications"
 	"github.com/wppconnect-team/wppconnect-server-go/internal/session"
-	"github.com/polymorfa/hypermeow/types/events"
 )
 
 type Target interface {
@@ -148,19 +148,28 @@ func (b *Bus) worker(offset int) {
 		err = b.targets[d.Target].Deliver(ctx, d.Event)
 		cancel()
 		state := "delivered"
+		failure := ""
 		next := time.Now()
 		if err != nil {
+			failure = "transport_error"
+			if errors.Is(err, context.DeadlineExceeded) {
+				failure = "timeout"
+			}
 			state = "pending"
 			delay := min(30*time.Second, b.options.RetryBase*time.Duration(1<<min(d.Attempt, 7)))
 			var targetError *DeliveryError
 			if errors.As(err, &targetError) {
 				if targetError.Permanent {
 					state = "failed"
+					failure = "permanent_rejection"
 				}
 				delay = max(delay, min(30*time.Second, targetError.After))
 			}
 			if d.Attempt+1 >= b.options.Attempts {
 				state = "failed"
+				if failure != "permanent_rejection" {
+					failure = "retry_exhausted"
+				}
 			}
 			next = next.Add(delay)
 		}
@@ -169,7 +178,7 @@ func (b *Bus) worker(offset int) {
 			continue
 		}
 		ctx, cancel = context.WithTimeout(context.Background(), 5*time.Second)
-		err = b.Log.finish(ctx, d, state, next)
+		err = b.Log.finish(ctx, d, state, next, failure)
 		cancel()
 		if err != nil {
 			log.Printf("event acknowledgement persistence failed: %v", err)

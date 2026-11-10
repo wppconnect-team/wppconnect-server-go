@@ -118,7 +118,7 @@ func extendedContract(name string) (routeContract, bool) {
 			c.body = requestSchema(chatMutationRequest{})
 		}
 		c.description = "SDK app-state mutation, local state updated only after acknowledgement. value is required except delete-chat/edit-label. Mute duration 0..31536000 seconds; 0 means forever. Label IDs 1..65535, name 1..100 characters, color 0..19; session limits 1000 labels/100000 associations. Message references must be in the same session/chat."
-	case "events", "events/replay", "events/ws":
+	case "events", "events/replay", "events/ws", "events/deliveries", "events/retry-failed", "events/replay-audit":
 		c.tag = "events"
 		c.success = 200
 		c.response = schema{"type": "object"}
@@ -126,6 +126,18 @@ func extendedContract(name string) (routeContract, bool) {
 		if name == "events/replay" {
 			c.success = 202
 			c.body = requestSchema(replayRequest{}, "eventId")
+			c.description += " Legacy replay requeues all enabled targets, including delivered targets; prefer retry-failed for failure recovery. Audit records use actorType legacy-api."
+		}
+		if name == "events/deliveries" {
+			c.description += " Requires target=webhook|nats|rabbitmq; state=failed (default)|pending|delivered. Returns metadata only, including safe failureCode. Cursor is event ingestion sequence for this target; restart from zero to find an older event whose state changed."
+		}
+		if name == "events/retry-failed" {
+			c.success = 202
+			c.body = requestSchema(failedReplayRequest{}, "eventId", "target")
+			c.description += " Requeues only the specified failed delivery to an enabled target, preserving delivered targets. A concurrent replay, active lease or nonfailed state returns 409. Ownership and audit commit atomically."
+		}
+		if name == "events/replay-audit" {
+			c.description += " Cursor is the monotonic replay audit sequence. Contains event ID, target, time, actor type and mode; no credentials or payload. Audit retains at most 100000 entries and is removed with the parent event."
 		}
 		if name == "events/ws" {
 			c.success = 101
