@@ -223,7 +223,7 @@ QR/phone pairing, event replay, observed history, text/quotes and these settings
 | Calls | Safe lifecycle metadata and reject-call. No call initiation or media transport. |
 | Polls | vote-poll validates retained poll choices, explicit [] withdraws. Decrypted latest-per-voter results are partial, with no secret or voter identity exposure. |
 | Buttons/lists | Experimental native legacy forms, opt-in ENABLE_EXPERIMENTAL_INTERACTIVES=true, up to 3 buttons/10 rows. No account/client delivery guarantee. |
-| Carousels | Authenticated explicit 501; no supported delivery implementation in this pinned SDK integration. |
+| Carousels | Image cards with quick replies behind the experimental flag; protocol serialization and HTTP contracts tested, cross-client rendering deferred. |
 | Business catalog/templates | Outside this roadmap's implemented scope; no parity claim. |
 
 ```bash

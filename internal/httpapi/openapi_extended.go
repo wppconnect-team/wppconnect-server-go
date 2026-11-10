@@ -87,8 +87,11 @@ func extendedContract(name string) (routeContract, bool) {
 		c.body = requestSchema(interactiveRequest{}, "phone", "message", "choices")
 		c.description = "Experimental legacy reply buttons/lists, disabled unless ENABLE_EXPERIMENTAL_INTERACTIVES=true. Delivery varies by WhatsApp client/account. Maximum 3 buttons or 10 list rows; no universal delivery guarantee."
 	case "send-carousel":
-		c.unsupported = true
-		c.description = "Carousel delivery is unavailable in this SDK and returns 501."
+		c.body = requestSchema(carouselRequest{}, "phone", "body", "cards")
+		card := requestSchema(carouselCard{}, "body", "imageBase64", "buttons")
+		card["properties"].(schema)["buttons"] = schema{"type": "array", "minItems": 1, "maxItems": 3, "items": requestSchema(carouselButton{}, "id", "label")}
+		c.body["properties"].(schema)["cards"] = schema{"type": "array", "minItems": 2, "maxItems": 10, "items": card}
+		c.description = "Experimental, disabled by default (501). Requires ENABLE_EXPERIMENTAL_INTERACTIVES. Send 2..10 JPEG/PNG cards, each up to 1 MiB/4096x4096, total JSON up to 4 MiB. Each card needs body, imageBase64 and 1..3 quick reply buttons with unique ids and labels. HTTP 201 means accepted for send, not rendered or delivered. No remote URLs or caller-provided media keys."
 	case "messages", "message-receipts", "poll-results":
 		c = historyContract()
 	case "send-reply":

@@ -28584,9 +28584,19 @@
     },
     "/api/{session}/send-carousel": {
       "post": {
-        "description": "Carousel delivery is unavailable in this SDK and returns 501.",
+        "description": "Experimental, disabled by default (501). Requires ENABLE_EXPERIMENTAL_INTERACTIVES. Send 2..10 JPEG/PNG cards, each up to 1 MiB/4096x4096, total JSON up to 4 MiB. Each card needs body, imageBase64 and 1..3 quick reply buttons with unique ids and labels. HTTP 201 means accepted for send, not rendered or delivered. No remote URLs or caller-provided media keys.",
         "operationId": "post_send_carousel",
         "parameters": [
+          {
+            "description": "Unique per session. Repeat the exact method, route, query, Content-Type and body to recover the persisted response without sending again. Changed input returns 409. Pending/ambiguous outcomes are never automatically retried. Completed responses retained at least 7 days. Never reuse a key for a new operation.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "pattern": "^[A-Za-z0-9._:-]{1,128}$",
+              "type": "string"
+            }
+          },
           {
             "in": "path",
             "name": "session",
@@ -28597,7 +28607,90 @@
             }
           }
         ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": false,
+                "properties": {
+                  "body": {
+                    "type": "string"
+                  },
+                  "cards": {
+                    "items": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "body": {
+                          "type": "string"
+                        },
+                        "buttons": {
+                          "items": {
+                            "additionalProperties": false,
+                            "properties": {
+                              "id": {
+                                "type": "string"
+                              },
+                              "label": {
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "id",
+                              "label"
+                            ],
+                            "type": "object"
+                          },
+                          "maxItems": 3,
+                          "minItems": 1,
+                          "type": "array"
+                        },
+                        "imageBase64": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "body",
+                        "imageBase64",
+                        "buttons"
+                      ],
+                      "type": "object"
+                    },
+                    "maxItems": 10,
+                    "minItems": 2,
+                    "type": "array"
+                  },
+                  "footer": {
+                    "type": "string"
+                  },
+                  "isGroup": {
+                    "type": "boolean"
+                  },
+                  "phone": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "phone",
+                  "body",
+                  "cards"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
         "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdvancedSent"
+                }
+              }
+            },
+            "description": "Success with the documented available protocol fields."
+          },
           "400": {
             "content": {
               "application/json": {
@@ -28774,7 +28867,7 @@
         "tags": [
           "messages"
         ],
-        "x-implemented": false
+        "x-implemented": true
       }
     },
     "/api/{session}/send-contact": {

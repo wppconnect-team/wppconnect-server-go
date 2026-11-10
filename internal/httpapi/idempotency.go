@@ -25,7 +25,7 @@ func idempotentSend(name string) bool {
 	switch name {
 	case "follow-newsletter-invite", "unfollow-newsletter-invite", "newsletter-reaction", "newsletter-mark-viewed", "newsletter-accept-tos", "newsletter-admin-invite":
 		return true
-	case "send-message", "send-reply", "send-image", "send-file", "send-file-base64", "send-voice", "send-voice-base64", "send-audio-base64", "send-video", "send-video-base64", "send-sticker", "send-sticker-gif", "send-contact", "contact-vcard", "send-location", "send-poll-message", "send-status-text", "send-status-media", "send-buttons", "send-list", "send-newsletter-text", "send-reaction":
+	case "send-message", "send-reply", "send-image", "send-file", "send-file-base64", "send-voice", "send-voice-base64", "send-audio-base64", "send-video", "send-video-base64", "send-sticker", "send-sticker-gif", "send-contact", "contact-vcard", "send-location", "send-poll-message", "send-status-text", "send-status-media", "send-buttons", "send-list", "send-carousel", "send-newsletter-text", "send-reaction":
 		return true
 	}
 	return false
