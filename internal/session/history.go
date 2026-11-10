@@ -2,12 +2,12 @@ package session
 
 import (
 	"context"
-	"go.mau.fi/whatsmeow/types"
+	"github.com/polymorfa/hypermeow/types"
 	"time"
 
 	"github.com/wppconnect-team/wppconnect-server-go/internal/media"
-	"go.mau.fi/whatsmeow/proto/waE2E"
-	"go.mau.fi/whatsmeow/types/events"
+	"github.com/polymorfa/hypermeow/proto/waE2E"
+	"github.com/polymorfa/hypermeow/types/events"
 )
 
 // ProtocolEventSink handles receipts, labels, calls and channel events.

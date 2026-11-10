@@ -7,8 +7,8 @@ import (
 	"strings"
 
 	"github.com/wppconnect-team/wppconnect-server-go/internal/groups"
-	"go.mau.fi/whatsmeow"
-	"go.mau.fi/whatsmeow/types"
+	"github.com/polymorfa/hypermeow"
+	"github.com/polymorfa/hypermeow/types"
 )
 
 type Client interface {

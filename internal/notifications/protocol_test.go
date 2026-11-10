@@ -2,8 +2,8 @@ package notifications
 
 import (
 	"encoding/json"
-	"go.mau.fi/whatsmeow/types"
-	"go.mau.fi/whatsmeow/types/events"
+	"github.com/polymorfa/hypermeow/types"
+	"github.com/polymorfa/hypermeow/types/events"
 	"strings"
 	"testing"
 )

@@ -7,8 +7,8 @@ import (
 	"time"
 
 	"github.com/wppconnect-team/wppconnect-server-go/internal/groups"
-	"go.mau.fi/whatsmeow/types"
-	"go.mau.fi/whatsmeow/types/events"
+	"github.com/polymorfa/hypermeow/types"
+	"github.com/polymorfa/hypermeow/types/events"
 )
 
 const PresenceTTL = 5 * time.Minute

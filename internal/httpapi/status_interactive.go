@@ -10,8 +10,8 @@ import (
 	"github.com/wppconnect-team/wppconnect-server-go/internal/directory"
 	"github.com/wppconnect-team/wppconnect-server-go/internal/media"
 	"github.com/wppconnect-team/wppconnect-server-go/internal/messages"
-	"go.mau.fi/whatsmeow/proto/waE2E"
-	"go.mau.fi/whatsmeow/types"
+	"github.com/polymorfa/hypermeow/proto/waE2E"
+	"github.com/polymorfa/hypermeow/types"
 	"google.golang.org/protobuf/proto"
 )
 

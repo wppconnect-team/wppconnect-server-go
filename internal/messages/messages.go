@@ -9,8 +9,8 @@ import (
 	"strings"
 	"unicode/utf8"
 
-	"go.mau.fi/whatsmeow"
-	"go.mau.fi/whatsmeow/proto/waE2E"
+	"github.com/polymorfa/hypermeow"
+	"github.com/polymorfa/hypermeow/proto/waE2E"
 	"google.golang.org/protobuf/proto"
 )
 

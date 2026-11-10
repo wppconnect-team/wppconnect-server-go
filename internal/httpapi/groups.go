@@ -18,8 +18,8 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/wppconnect-team/wppconnect-server-go/internal/groups"
 	"github.com/wppconnect-team/wppconnect-server-go/internal/media"
-	"go.mau.fi/whatsmeow"
-	"go.mau.fi/whatsmeow/types"
+	"github.com/polymorfa/hypermeow"
+	"github.com/polymorfa/hypermeow/types"
 )
 
 func (s *Server) groupRoutes(r chi.Router) {

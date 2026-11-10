@@ -13,8 +13,8 @@ import (
 	"os"
 	"testing"
 
-	"go.mau.fi/whatsmeow"
-	"go.mau.fi/whatsmeow/store"
+	"github.com/polymorfa/hypermeow"
+	"github.com/polymorfa/hypermeow/store"
 	"golang.org/x/crypto/hkdf"
 )
 

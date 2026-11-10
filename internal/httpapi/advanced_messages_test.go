@@ -11,7 +11,7 @@ import (
 	"strings"
 	"testing"
 
-	"go.mau.fi/whatsmeow"
+	"github.com/polymorfa/hypermeow"
 )
 
 func advancedFixture(t *testing.T, name string) []byte {

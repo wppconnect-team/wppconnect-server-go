@@ -9,10 +9,10 @@ import (
 	"testing"
 	"time"
 
-	"go.mau.fi/whatsmeow"
-	"go.mau.fi/whatsmeow/proto/waAdv"
-	"go.mau.fi/whatsmeow/types"
-	"go.mau.fi/whatsmeow/types/events"
+	"github.com/polymorfa/hypermeow"
+	"github.com/polymorfa/hypermeow/proto/waAdv"
+	"github.com/polymorfa/hypermeow/types"
+	"github.com/polymorfa/hypermeow/types/events"
 )
 
 type fakeRuntime struct {

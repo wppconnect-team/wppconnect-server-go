@@ -6,7 +6,7 @@ import (
 	"testing"
 	"unicode/utf8"
 
-	"go.mau.fi/whatsmeow"
+	"github.com/polymorfa/hypermeow"
 )
 
 func TestContactsEscapingAndFolding(t *testing.T) {

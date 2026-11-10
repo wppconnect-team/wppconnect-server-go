@@ -8,8 +8,8 @@ import (
 	"sync"
 	"time"
 
-	"go.mau.fi/whatsmeow"
-	"go.mau.fi/whatsmeow/proto/waE2E"
+	"github.com/polymorfa/hypermeow"
+	"github.com/polymorfa/hypermeow/proto/waE2E"
 )
 
 const CacheEntries = 1024

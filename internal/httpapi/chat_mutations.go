@@ -12,7 +12,7 @@ import (
 	"github.com/wppconnect-team/wppconnect-server-go/internal/directory"
 	"github.com/wppconnect-team/wppconnect-server-go/internal/history"
 	"github.com/wppconnect-team/wppconnect-server-go/internal/messages"
-	"go.mau.fi/whatsmeow/appstate"
+	"github.com/polymorfa/hypermeow/appstate"
 )
 
 type chatMutationRequest struct {

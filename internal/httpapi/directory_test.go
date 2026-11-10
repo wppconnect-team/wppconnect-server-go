@@ -15,10 +15,10 @@ import (
 	"github.com/wppconnect-team/wppconnect-server-go/internal/auth"
 	"github.com/wppconnect-team/wppconnect-server-go/internal/config"
 	"github.com/wppconnect-team/wppconnect-server-go/internal/directory"
-	"go.mau.fi/whatsmeow"
-	"go.mau.fi/whatsmeow/proto/waHistorySync"
-	"go.mau.fi/whatsmeow/types"
-	"go.mau.fi/whatsmeow/types/events"
+	"github.com/polymorfa/hypermeow"
+	"github.com/polymorfa/hypermeow/proto/waHistorySync"
+	"github.com/polymorfa/hypermeow/types"
+	"github.com/polymorfa/hypermeow/types/events"
 	"google.golang.org/protobuf/proto"
 )
 

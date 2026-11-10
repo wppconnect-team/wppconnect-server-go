@@ -13,9 +13,9 @@ import (
 	"os"
 	"strings"
 
-	"go.mau.fi/whatsmeow"
-	"go.mau.fi/whatsmeow/proto/waE2E"
-	"go.mau.fi/whatsmeow/types"
+	"github.com/polymorfa/hypermeow"
+	"github.com/polymorfa/hypermeow/proto/waE2E"
+	"github.com/polymorfa/hypermeow/types"
 	"google.golang.org/protobuf/proto"
 )
 

@@ -14,7 +14,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/wppconnect-team/wppconnect-server-go/internal/media"
-	"go.mau.fi/whatsmeow/types"
+	"github.com/polymorfa/hypermeow/types"
 	"google.golang.org/protobuf/proto"
 )
 
