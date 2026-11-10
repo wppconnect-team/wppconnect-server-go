@@ -1,0 +1,35 @@
+name: Check Chatwoot webhook compatibility
+on:
+  pull_request:
+    paths:
+      - 'cmd/chatwoot-text-relay/**'
+      - 'scripts/chatwoot-signature-fixture.rb'
+      - '.github/workflows/chatwoot-relay.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'cmd/chatwoot-text-relay/**'
+      - 'scripts/chatwoot-signature-fixture.rb'
+      - '.github/workflows/chatwoot-relay.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  signed-callback:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+      - name: Verify a callback signed by Chatwoot v4.19.1
+        env:
+          CHATWOOT_TEST_IMAGE: chatwoot/chatwoot@sha256:a0d571a3a2f78f4fa4b1d7c21a53309c0184068d6021b3664ab37788faef04c1
+        run: |
+          export CHATWOOT_SIGNATURE_FIXTURE="$RUNNER_TEMP/chatwoot-signature.json"
+          umask 077
+          docker run --rm -i --network none --entrypoint bundle "$CHATWOOT_TEST_IMAGE" exec ruby - < scripts/chatwoot-signature-fixture.rb > "$CHATWOOT_SIGNATURE_FIXTURE"
+          go test ./cmd/chatwoot-text-relay -count=1 -run '^TestChatwootReleaseCallback$' -v
