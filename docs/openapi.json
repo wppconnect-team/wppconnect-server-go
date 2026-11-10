@@ -7734,6 +7734,16 @@
         "operationId": "post_contact_vcard",
         "parameters": [
           {
+            "description": "Unique per session. Repeat the exact method, route, query, Content-Type and body to recover the persisted response without sending again. Changed input returns 409. Pending/ambiguous outcomes are never automatically retried. Completed responses retained at least 7 days. Never reuse a key for a new operation.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "pattern": "^[A-Za-z0-9._:-]{1,128}$",
+              "type": "string"
+            }
+          },
+          {
             "in": "path",
             "name": "session",
             "required": true,
@@ -24904,6 +24914,16 @@
         "operationId": "post_send_audio_base64",
         "parameters": [
           {
+            "description": "Unique per session. Repeat the exact method, route, query, Content-Type and body to recover the persisted response without sending again. Changed input returns 409. Pending/ambiguous outcomes are never automatically retried. Completed responses retained at least 7 days. Never reuse a key for a new operation.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "pattern": "^[A-Za-z0-9._:-]{1,128}$",
+              "type": "string"
+            }
+          },
+          {
             "in": "path",
             "name": "session",
             "required": true,
@@ -25148,6 +25168,16 @@
         "description": "Experimental legacy reply buttons/lists, disabled unless ENABLE_EXPERIMENTAL_INTERACTIVES=true. Delivery varies by WhatsApp client/account. Maximum 3 buttons or 10 list rows; no universal delivery guarantee.",
         "operationId": "post_send_buttons",
         "parameters": [
+          {
+            "description": "Unique per session. Repeat the exact method, route, query, Content-Type and body to recover the persisted response without sending again. Changed input returns 409. Pending/ambiguous outcomes are never automatically retried. Completed responses retained at least 7 days. Never reuse a key for a new operation.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "pattern": "^[A-Za-z0-9._:-]{1,128}$",
+              "type": "string"
+            }
+          },
           {
             "in": "path",
             "name": "session",
@@ -25603,6 +25633,16 @@
         "operationId": "post_send_contact",
         "parameters": [
           {
+            "description": "Unique per session. Repeat the exact method, route, query, Content-Type and body to recover the persisted response without sending again. Changed input returns 409. Pending/ambiguous outcomes are never automatically retried. Completed responses retained at least 7 days. Never reuse a key for a new operation.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "pattern": "^[A-Za-z0-9._:-]{1,128}$",
+              "type": "string"
+            }
+          },
+          {
             "in": "path",
             "name": "session",
             "required": true,
@@ -25910,6 +25950,16 @@
         "operationId": "post_send_file",
         "parameters": [
           {
+            "description": "Unique per session. Repeat the exact method, route, query, Content-Type and body to recover the persisted response without sending again. Changed input returns 409. Pending/ambiguous outcomes are never automatically retried. Completed responses retained at least 7 days. Never reuse a key for a new operation.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "pattern": "^[A-Za-z0-9._:-]{1,128}$",
+              "type": "string"
+            }
+          },
+          {
             "in": "path",
             "name": "session",
             "required": true,
@@ -26154,6 +26204,16 @@
         "description": "Bounded media upload; at most four concurrent media operations per process.",
         "operationId": "post_send_file_base64",
         "parameters": [
+          {
+            "description": "Unique per session. Repeat the exact method, route, query, Content-Type and body to recover the persisted response without sending again. Changed input returns 409. Pending/ambiguous outcomes are never automatically retried. Completed responses retained at least 7 days. Never reuse a key for a new operation.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "pattern": "^[A-Za-z0-9._:-]{1,128}$",
+              "type": "string"
+            }
+          },
           {
             "in": "path",
             "name": "session",
@@ -26400,6 +26460,16 @@
         "operationId": "post_send_image",
         "parameters": [
           {
+            "description": "Unique per session. Repeat the exact method, route, query, Content-Type and body to recover the persisted response without sending again. Changed input returns 409. Pending/ambiguous outcomes are never automatically retried. Completed responses retained at least 7 days. Never reuse a key for a new operation.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "pattern": "^[A-Za-z0-9._:-]{1,128}$",
+              "type": "string"
+            }
+          },
+          {
             "in": "path",
             "name": "session",
             "required": true,
@@ -26644,6 +26714,16 @@
         "description": "Experimental legacy reply buttons/lists, disabled unless ENABLE_EXPERIMENTAL_INTERACTIVES=true. Delivery varies by WhatsApp client/account. Maximum 3 buttons or 10 list rows; no universal delivery guarantee.",
         "operationId": "post_send_list",
         "parameters": [
+          {
+            "description": "Unique per session. Repeat the exact method, route, query, Content-Type and body to recover the persisted response without sending again. Changed input returns 409. Pending/ambiguous outcomes are never automatically retried. Completed responses retained at least 7 days. Never reuse a key for a new operation.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "pattern": "^[A-Za-z0-9._:-]{1,128}$",
+              "type": "string"
+            }
+          },
           {
             "in": "path",
             "name": "session",
@@ -26903,6 +26983,16 @@
         "description": "Static location only. Zero coordinates are valid; numbers and Node numeric strings are accepted. JSON limit 64 KiB, four shared operation slots, 60 second batch deadline. Errors can include completed IDs and failedRecipient; failed delivery may be unknown.",
         "operationId": "post_send_location",
         "parameters": [
+          {
+            "description": "Unique per session. Repeat the exact method, route, query, Content-Type and body to recover the persisted response without sending again. Changed input returns 409. Pending/ambiguous outcomes are never automatically retried. Completed responses retained at least 7 days. Never reuse a key for a new operation.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "pattern": "^[A-Za-z0-9._:-]{1,128}$",
+              "type": "string"
+            }
+          },
           {
             "in": "path",
             "name": "session",
@@ -27194,6 +27284,16 @@
         "operationId": "post_send_message",
         "parameters": [
           {
+            "description": "Unique per session. Repeat the exact method, route, query, Content-Type and body to recover the persisted response without sending again. Changed input returns 409. Pending/ambiguous outcomes are never automatically retried. Completed responses retained at least 7 days. Never reuse a key for a new operation.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "pattern": "^[A-Za-z0-9._:-]{1,128}$",
+              "type": "string"
+            }
+          },
+          {
             "in": "path",
             "name": "session",
             "required": true,
@@ -27446,6 +27546,16 @@
         "description": "Connected-session SDK operations; parent membership/roles enforced by WhatsApp. Communities use group JIDs, newsletters numeric @newsletter JIDs. Newsletter count 1..100, subscribe returns expiration without automatic renewal. Poll choice names must match a retained poll in the same chat; [] withdraws. Limits and partial creation effects are documented in the roadmap guide.",
         "operationId": "post_send_newsletter_text",
         "parameters": [
+          {
+            "description": "Unique per session. Repeat the exact method, route, query, Content-Type and body to recover the persisted response without sending again. Changed input returns 409. Pending/ambiguous outcomes are never automatically retried. Completed responses retained at least 7 days. Never reuse a key for a new operation.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "pattern": "^[A-Za-z0-9._:-]{1,128}$",
+              "type": "string"
+            }
+          },
           {
             "in": "path",
             "name": "session",
@@ -27726,6 +27836,16 @@
         "description": "Native poll creation with independent SDK-generated secret per recipient; distinct trimmed/case-insensitive choices. No vote decryption or aggregation. Structured sends share four operation slots, 64 KiB request and 60 second batch timeout. JSON limit 64 KiB, four shared operation slots, 60 second batch deadline. Errors can include completed IDs and failedRecipient; failed delivery may be unknown.",
         "operationId": "post_send_poll_message",
         "parameters": [
+          {
+            "description": "Unique per session. Repeat the exact method, route, query, Content-Type and body to recover the persisted response without sending again. Changed input returns 409. Pending/ambiguous outcomes are never automatically retried. Completed responses retained at least 7 days. Never reuse a key for a new operation.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "pattern": "^[A-Za-z0-9._:-]{1,128}$",
+              "type": "string"
+            }
+          },
           {
             "in": "path",
             "name": "session",
@@ -28010,6 +28130,16 @@
         "operationId": "post_send_reaction",
         "parameters": [
           {
+            "description": "Unique per session. Repeat the exact method, route, query, Content-Type and body to recover the persisted response without sending again. Changed input returns 409. Pending/ambiguous outcomes are never automatically retried. Completed responses retained at least 7 days. Never reuse a key for a new operation.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "pattern": "^[A-Za-z0-9._:-]{1,128}$",
+              "type": "string"
+            }
+          },
+          {
             "in": "path",
             "name": "session",
             "required": true,
@@ -28252,6 +28382,16 @@
         "description": "Text with persisted quote from each destination chat; quoted keys/secrets cannot be supplied. Up to 100 mentions, 65536 text characters.",
         "operationId": "post_send_reply",
         "parameters": [
+          {
+            "description": "Unique per session. Repeat the exact method, route, query, Content-Type and body to recover the persisted response without sending again. Changed input returns 409. Pending/ambiguous outcomes are never automatically retried. Completed responses retained at least 7 days. Never reuse a key for a new operation.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "pattern": "^[A-Za-z0-9._:-]{1,128}$",
+              "type": "string"
+            }
+          },
           {
             "in": "path",
             "name": "session",
@@ -28501,6 +28641,244 @@
         "x-implemented": true
       }
     },
+    "/api/{session}/send-result": {
+      "get": {
+        "description": "Recover a stored send response by Idempotency-Key within this authenticated session. pending_or_unknown and ambiguous outcomes must never be automatically resent with a new key. Complete results are retained for at least 7 days; unresolved reservations do not expire automatically.",
+        "operationId": "get_send_result",
+        "parameters": [
+          {
+            "description": "Unique per session. Repeat the exact method, route, query, Content-Type and body to recover the persisted response without sending again. Changed input returns 409. Pending/ambiguous outcomes are never automatically retried. Completed responses retained at least 7 days. Never reuse a key for a new operation.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": true,
+            "schema": {
+              "pattern": "^[A-Za-z0-9._:-]{1,128}$",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "session",
+            "required": true,
+            "schema": {
+              "description": "Session name; legacy session:token URL form is accepted but exposes credentials in URLs.",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "createdAt": {
+                      "format": "int64",
+                      "type": "integer"
+                    },
+                    "httpStatus": {
+                      "format": "int64",
+                      "type": "integer"
+                    },
+                    "response": {},
+                    "state": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "status",
+                    "state",
+                    "httpStatus",
+                    "createdAt"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Success with the documented available protocol fields."
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Operation error; inspect status/message and any completed work."
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Operation error; inspect status/message and any completed work."
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Operation error; inspect status/message and any completed work."
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Operation error; inspect status/message and any completed work."
+          },
+          "408": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Operation error; inspect status/message and any completed work."
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Operation error; inspect status/message and any completed work."
+          },
+          "410": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Operation error; inspect status/message and any completed work."
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Operation error; inspect status/message and any completed work."
+          },
+          "415": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Operation error; inspect status/message and any completed work."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Operation error; inspect status/message and any completed work."
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Operation error; inspect status/message and any completed work."
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Operation error; inspect status/message and any completed work."
+          },
+          "501": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Operation error; inspect status/message and any completed work."
+          },
+          "502": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Operation error; inspect status/message and any completed work."
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Operation error; inspect status/message and any completed work."
+          },
+          "504": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Operation error; inspect status/message and any completed work."
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "adminBearer": []
+          },
+          {
+            "adminCookie": []
+          }
+        ],
+        "summary": "send-result",
+        "tags": [
+          "messages"
+        ],
+        "x-implemented": true
+      }
+    },
     "/api/{session}/send-seen": {
       "post": {
         "description": "",
@@ -28729,6 +29107,16 @@
         "description": "Publish image or MP4 status using the account's status privacy audience. Same bounded uploads as messaging; phone is unused.",
         "operationId": "post_send_status_media",
         "parameters": [
+          {
+            "description": "Unique per session. Repeat the exact method, route, query, Content-Type and body to recover the persisted response without sending again. Changed input returns 409. Pending/ambiguous outcomes are never automatically retried. Completed responses retained at least 7 days. Never reuse a key for a new operation.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "pattern": "^[A-Za-z0-9._:-]{1,128}$",
+              "type": "string"
+            }
+          },
           {
             "in": "path",
             "name": "session",
@@ -29029,6 +29417,16 @@
         "operationId": "post_send_status_text",
         "parameters": [
           {
+            "description": "Unique per session. Repeat the exact method, route, query, Content-Type and body to recover the persisted response without sending again. Changed input returns 409. Pending/ambiguous outcomes are never automatically retried. Completed responses retained at least 7 days. Never reuse a key for a new operation.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "pattern": "^[A-Za-z0-9._:-]{1,128}$",
+              "type": "string"
+            }
+          },
+          {
             "in": "path",
             "name": "session",
             "required": true,
@@ -29251,6 +29649,16 @@
         "description": "Bounded media upload; at most four concurrent media operations per process. Prepared 512x512 WebP only, static 100 KiB or animated 500 KiB, 120 frames/10 seconds, frame minimum 10 ms. No captions or transcoding; send-sticker-gif requires animated WebP, not GIF.",
         "operationId": "post_send_sticker",
         "parameters": [
+          {
+            "description": "Unique per session. Repeat the exact method, route, query, Content-Type and body to recover the persisted response without sending again. Changed input returns 409. Pending/ambiguous outcomes are never automatically retried. Completed responses retained at least 7 days. Never reuse a key for a new operation.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "pattern": "^[A-Za-z0-9._:-]{1,128}$",
+              "type": "string"
+            }
+          },
           {
             "in": "path",
             "name": "session",
@@ -29497,6 +29905,16 @@
         "operationId": "post_send_sticker_gif",
         "parameters": [
           {
+            "description": "Unique per session. Repeat the exact method, route, query, Content-Type and body to recover the persisted response without sending again. Changed input returns 409. Pending/ambiguous outcomes are never automatically retried. Completed responses retained at least 7 days. Never reuse a key for a new operation.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "pattern": "^[A-Za-z0-9._:-]{1,128}$",
+              "type": "string"
+            }
+          },
+          {
             "in": "path",
             "name": "session",
             "required": true,
@@ -29741,6 +30159,16 @@
         "description": "Bounded media upload; at most four concurrent media operations per process. Go extension: MP4/H.264 with optional AAC, at most 16 MiB, 4096x4096, one hour; container inspection only, no transcoding.",
         "operationId": "post_send_video",
         "parameters": [
+          {
+            "description": "Unique per session. Repeat the exact method, route, query, Content-Type and body to recover the persisted response without sending again. Changed input returns 409. Pending/ambiguous outcomes are never automatically retried. Completed responses retained at least 7 days. Never reuse a key for a new operation.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "pattern": "^[A-Za-z0-9._:-]{1,128}$",
+              "type": "string"
+            }
+          },
           {
             "in": "path",
             "name": "session",
@@ -29987,6 +30415,16 @@
         "operationId": "post_send_video_base64",
         "parameters": [
           {
+            "description": "Unique per session. Repeat the exact method, route, query, Content-Type and body to recover the persisted response without sending again. Changed input returns 409. Pending/ambiguous outcomes are never automatically retried. Completed responses retained at least 7 days. Never reuse a key for a new operation.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "pattern": "^[A-Za-z0-9._:-]{1,128}$",
+              "type": "string"
+            }
+          },
+          {
             "in": "path",
             "name": "session",
             "required": true,
@@ -30232,6 +30670,16 @@
         "operationId": "post_send_voice",
         "parameters": [
           {
+            "description": "Unique per session. Repeat the exact method, route, query, Content-Type and body to recover the persisted response without sending again. Changed input returns 409. Pending/ambiguous outcomes are never automatically retried. Completed responses retained at least 7 days. Never reuse a key for a new operation.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "pattern": "^[A-Za-z0-9._:-]{1,128}$",
+              "type": "string"
+            }
+          },
+          {
             "in": "path",
             "name": "session",
             "required": true,
@@ -30476,6 +30924,16 @@
         "description": "Bounded media upload; at most four concurrent media operations per process.",
         "operationId": "post_send_voice_base64",
         "parameters": [
+          {
+            "description": "Unique per session. Repeat the exact method, route, query, Content-Type and body to recover the persisted response without sending again. Changed input returns 409. Pending/ambiguous outcomes are never automatically retried. Completed responses retained at least 7 days. Never reuse a key for a new operation.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "pattern": "^[A-Za-z0-9._:-]{1,128}$",
+              "type": "string"
+            }
+          },
           {
             "in": "path",
             "name": "session",

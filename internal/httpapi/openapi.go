@@ -86,6 +86,10 @@ type routeContract struct {
 func contractFor(name string) routeContract {
 	c := routeContract{tag: "sessions", success: 200, response: ref("Success")}
 	switch name {
+	case "send-result":
+		c.tag = "messages"
+		c.description = "Recover a stored send response by Idempotency-Key within this authenticated session. pending_or_unknown and ambiguous outcomes must never be automatically resent with a new key. Complete results are retained for at least 7 days; unresolved reservations do not expire automatically."
+		c.response = object(schema{"status": str(), "state": str(), "httpStatus": integer(), "response": schema{}, "createdAt": integer()}, "status", "state", "httpStatus", "createdAt")
 	case "healthz", "readyz":
 		c.tag = "operation"
 		c.description = "Liveness, or readiness after restoration. Independent of individual WhatsApp connectivity."
@@ -339,6 +343,9 @@ func buildOpenAPI() []byte {
 			operation["operationId"] = operation["operationId"].(string) + "_by_id"
 		}
 		params := make([]schema, 0)
+		if (method == http.MethodPost && idempotentSend(name)) || name == "send-result" {
+			params = append(params, schema{"name": "Idempotency-Key", "in": "header", "required": name == "send-result", "schema": schema{"type": "string", "pattern": `^[A-Za-z0-9._:-]{1,128}$`}, "description": "Unique per session. Repeat the exact method, route, query, Content-Type and body to recover the persisted response without sending again. Changed input returns 409. Pending/ambiguous outcomes are never automatically retried. Completed responses retained at least 7 days. Never reuse a key for a new operation."})
+		}
 		for _, match := range pattern.FindAllStringSubmatch(path, -1) {
 			param := str()
 			if match[1] == "session" {
