@@ -13,6 +13,8 @@ import (
 // intentionally aligned with the Node server so clients can migrate with the
 // same mental model (secretKey auth, webhook URL, port).
 type Config struct {
+	RedisStreamURL, RedisStreamKey                           string
+	RedisStreamMaxLen                                        int
 	WebhookPublicOnly                                        bool
 	ExperimentalInteractives                                 bool
 	Port                                                     string
@@ -45,12 +47,13 @@ type Config struct {
 // Node server uses where applicable.
 func Load() (Config, error) {
 	cfg := Config{
-		Port:          getEnv("PORT", "21465"),
-		SecretKey:     getEnv("SECRET_KEY", "THISISMYSECURETOKEN"),
-		WebhookURL:    getEnv("WEBHOOK_URL", ""),
-		WebhookSecret: os.Getenv("WEBHOOK_SECRET"),
-		DataDir:       getEnv("DATA_DIR", "./userDataDir"),
-		AdminToken:    os.Getenv("ADMIN_TOKEN"), NATSURL: os.Getenv("NATS_URL"), RabbitMQURL: os.Getenv("AMQP_URL"),
+		Port:           getEnv("PORT", "21465"),
+		SecretKey:      getEnv("SECRET_KEY", "THISISMYSECURETOKEN"),
+		WebhookURL:     getEnv("WEBHOOK_URL", ""),
+		WebhookSecret:  os.Getenv("WEBHOOK_SECRET"),
+		RedisStreamURL: os.Getenv("REDIS_STREAM_URL"), RedisStreamKey: getEnv("REDIS_STREAM_KEY", "wppconnect.events"),
+		DataDir:    getEnv("DATA_DIR", "./userDataDir"),
+		AdminToken: os.Getenv("ADMIN_TOKEN"), NATSURL: os.Getenv("NATS_URL"), RabbitMQURL: os.Getenv("AMQP_URL"),
 		S3Endpoint: os.Getenv("S3_ENDPOINT"), S3AccessKey: os.Getenv("S3_ACCESS_KEY_ID"), S3SecretKey: os.Getenv("S3_SECRET_ACCESS_KEY"), S3Bucket: os.Getenv("S3_BUCKET"), S3Region: os.Getenv("S3_REGION"),
 	}
 	var err error
@@ -97,7 +100,7 @@ func Load() (Config, error) {
 		dest          *int
 		maximum       int
 	}{
-		{"HISTORY_MAX_MESSAGES", "100000", &cfg.HistoryMaxMessages, 1000000}, {"OUTBOX_MAX_EVENTS", "100000", &cfg.OutboxMaxEvents, 1000000},
+		{"HISTORY_MAX_MESSAGES", "100000", &cfg.HistoryMaxMessages, 1000000}, {"REDIS_STREAM_MAXLEN", "10000", &cfg.RedisStreamMaxLen, 1000000}, {"OUTBOX_MAX_EVENTS", "100000", &cfg.OutboxMaxEvents, 1000000},
 	} {
 		*item.dest, err = strconv.Atoi(getEnv(item.key, item.fallback))
 		if err != nil || *item.dest < 1 || *item.dest > item.maximum {

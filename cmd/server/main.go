@@ -96,6 +96,14 @@ func run(ctx context.Context, cfg config.Config) error {
 		}
 		targets = append(targets, &eventbus.RabbitMQ{URL: cfg.RabbitMQURL})
 	}
+	if cfg.RedisStreamURL != "" {
+		target, e := eventbus.NewRedisStream(cfg.RedisStreamURL, cfg.RedisStreamKey, cfg.RedisStreamMaxLen)
+		if e != nil {
+			eventLog.Close()
+			return e
+		}
+		targets = append(targets, target)
+	}
 	options := eventbus.DefaultOptions()
 	options.Workers, options.Attempts, options.Timeout = cfg.WebhookWorkers, cfg.WebhookAttempts, cfg.WebhookTimeout
 	sink, err := eventbus.New(eventLog, targets, options)
