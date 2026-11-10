@@ -9,6 +9,10 @@ import (
 	"time"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/polymorfa/hypermeow"
+	"github.com/polymorfa/hypermeow/proto/waE2E"
+	"github.com/polymorfa/hypermeow/types"
+	"github.com/polymorfa/hypermeow/types/events"
 	"github.com/wppconnect-team/wppconnect-server-go/internal/account"
 	"github.com/wppconnect-team/wppconnect-server-go/internal/channels"
 	"github.com/wppconnect-team/wppconnect-server-go/internal/directory"
@@ -16,10 +20,6 @@ import (
 	"github.com/wppconnect-team/wppconnect-server-go/internal/history"
 	"github.com/wppconnect-team/wppconnect-server-go/internal/media"
 	"github.com/wppconnect-team/wppconnect-server-go/internal/messages"
-	"github.com/polymorfa/hypermeow"
-	"github.com/polymorfa/hypermeow/proto/waE2E"
-	"github.com/polymorfa/hypermeow/types"
-	"github.com/polymorfa/hypermeow/types/events"
 )
 
 type channelRequest struct {
@@ -41,6 +41,7 @@ type channelRequest struct {
 
 func (s *Server) channelRoutes(r chi.Router) {
 	s.newsletterRoutes(r)
+	s.catalogRoutes(r)
 	r.Get("/api/{session}/newsletters", s.channelOperation("newsletters"))
 	for _, name := range []string{"create-community", "community-info", "link-community-group", "unlink-community-group", "create-newsletter", "newsletter-info", "follow-newsletter", "unfollow-newsletter", "mute-newsletter", "subscribe-newsletter", "newsletter-messages", "send-newsletter-text", "reject-call", "vote-poll"} {
 		r.Post("/api/{session}/"+name, s.channelOperation(name))
