@@ -70,23 +70,38 @@ func (v *Vault) Archive(ctx context.Context, store *history.Store, session, chat
 	if v.Objects == nil || v.Retention <= 0 || v.Retention > 30*24*time.Hour {
 		return history.StoredMedia{}, errors.New("invalid media vault configuration")
 	}
+	now := time.Now()
 	hash := sha256.Sum256(data)
-	m := history.StoredMedia{Chat: chat, ID: id, Key: objectKey(session, chat, id) + "/" + uuid.NewString(), MIME: mime, Size: int64(len(data)), Hash: hex.EncodeToString(hash[:]), Expires: time.Now().Add(v.Retention).UnixMilli()}
+	m := history.StoredMedia{Chat: chat, ID: id, Key: objectKey(session, chat, id) + "/" + uuid.NewString(), MIME: mime, Size: int64(len(data)), Hash: hex.EncodeToString(hash[:]), Expires: now.Add(v.Retention).UnixMilli()}
 	reservation := m
-	reservation.Expires = time.Now().Add(time.Hour).UnixMilli()
+	reservation.Expires = now.Add(time.Hour).UnixMilli()
 	if err := store.ReserveMedia(ctx, reservation); err != nil {
-		return m, err
+		prior, lookupErr := store.ActiveMediaReservation(ctx, chat, id)
+		if lookupErr != nil || !owns(session, prior) || prior.MIME != mime || prior.Size != m.Size || prior.Hash != m.Hash {
+			return history.StoredMedia{}, err
+		}
+		saved, getErr := v.Objects.Get(ctx, prior.Key)
+		if getErr != nil || !bytes.Equal(saved, data) {
+			return history.StoredMedia{}, errors.New("existing media upload could not be verified")
+		}
+		if prior.Ready {
+			return store.ConfirmMedia(ctx, prior, prior.Expires)
+		}
+		// A pending reservation expires one hour after the original attempt.
+		// Recover its original retention window, even after a process restart.
+		expires := time.UnixMilli(prior.Expires).Add(v.Retention - time.Hour).UnixMilli()
+		return store.ConfirmMedia(ctx, prior, expires)
 	}
 	if err := v.Objects.Put(ctx, m.Key, data, mime); err != nil {
 		// Keep the durable reservation: a failed/ambiguous upload is cleaned up
 		// by retention, even if the object server accepted it before timing out.
-		return m, errors.New("object upload failed; reserved object will be cleaned up by retention")
+		return m, errors.New("object upload unconfirmed; repeat the archive to verify the reserved object")
 	}
-	if err := store.FinishMedia(ctx, m); err != nil {
+	confirmed, err := store.ConfirmMedia(ctx, m, m.Expires)
+	if err != nil {
 		return m, errors.New("object uploaded; metadata acknowledgement failed")
 	}
-	m.Ready = true
-	return m, nil
+	return confirmed, nil
 }
 func (v *Vault) Download(ctx context.Context, store *history.Store, session, chat, id string) (history.StoredMedia, []byte, error) {
 	m, err := store.Media(ctx, chat, id)

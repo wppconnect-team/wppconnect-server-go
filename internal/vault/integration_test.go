@@ -57,6 +57,21 @@ func TestIntegrationS3PrivateArchiveIntegrityAndCleanup(t *testing.T) {
 	if response.StatusCode != 403 {
 		t.Fatalf("anonymous object access: HTTP %d", response.StatusCode)
 	}
+	// The underlying S3 service commits the object before the client loses the reply.
+	uncertain := &lostUploadReply{Objects: objects}
+	recovering := &Vault{Objects: uncertain, Retention: time.Hour}
+	original, err := recovering.Archive(ctx, store, "alpha", chat, "lost-reply", "text/plain", data)
+	if err == nil {
+		t.Fatal("unconfirmed upload returned success")
+	}
+	defer objects.Delete(context.Background(), original.Key)
+	recovered, err := recovering.Archive(ctx, store, "alpha", chat, "lost-reply", "text/plain", data)
+	if err != nil || !recovered.Ready || recovered.Key != original.Key || uncertain.puts != 1 {
+		t.Fatalf("S3 recovery failed: %v", err)
+	}
+	if err := recovering.Delete(ctx, store, "alpha", recovered); err != nil {
+		t.Fatal(err)
+	}
 	meta.Expires = time.Now().Add(-time.Second).UnixMilli()
 	if err = store.FinishMedia(ctx, meta); err != nil {
 		t.Fatal(err)
