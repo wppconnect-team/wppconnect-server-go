@@ -9,7 +9,7 @@ curl "$SERVER/api/$SESSION/events/deliveries?target=webhook&state=failed&limit=5
   -H "Authorization: Bearer $TOKEN"
 ```
 
-`target` is required: `webhook`, `nats` or `rabbitmq`. `state` is `failed`
+`target` is required: `webhook`, `nats`, `rabbitmq` or `redis-streams`. `state` is `failed`
 (default), `pending` or `delivered`. `cursor` is an event ingestion sequence,
 initially zero; `limit` is 1..200. Keep the target and state unchanged while
 paging. This is a live view, not a frozen snapshot: restart from zero to discover
@@ -89,3 +89,13 @@ The durable log remains bounded by retention, event count and payload bytes.
 It is not an infinite archive. Do not remove session volumes or edit SQLite while
 the server is using it. Migration adds failure metadata and audit tables without
 resetting existing delivery states or attempt counts.
+
+## Redis Streams (opt-in)
+
+Leave `REDIS_STREAM_URL` empty to disable the target. Only the runtime operator selects the destination. Configure a dedicated Redis database or ACL-protected key for this runtime: one target receives the events of every session served by the process. Do not share a stream with another customer. Use `rediss://` for TLS across hosts. Inject credentials through the deployment's secret store. Do not put connection URLs in tickets or logs. The URL may contain a database number, but no query options.
+
+`REDIS_STREAM_KEY` defaults to `wppconnect.events` (1..128 letters, digits, dots, underscores, hyphens or colons). `REDIS_STREAM_MAXLEN` defaults to 10000 entries (1..1000000). Each [XADD](https://redis.io/docs/latest/commands/xadd/) appends the fields `eventId`, `session`, `event`, `createdAt` (Unix milliseconds) and `payload` (exact JSON), trimming the oldest entries to this count. The limit is in entries, not bytes. Size Redis memory and persistence for your payloads. Trimming may remove entries a slow consumer has not processed.
+
+A successful delivery means Redis acknowledged the append. It does not confirm consumer processing, replica acknowledgement or a disk flush. Consumers must deduplicate by `eventId`, not the Redis stream entry ID: after a lost reply, replay can append a second entry for the same event. Retain deduplication records through your replay window. The existing SQLite outbox controls attempts, failure reporting and selective replay; use `target=redis-streams` when investigating. Moving the configured destination also changes where future retries for this target are delivered.
+
+For an isolated integration test use the Redis service in `deploy/integration-test.yml` and set `INTEGRATION_REDIS_URL=redis://127.0.0.1:16379/0`. The test uses a unique key, forces a wrong-type rejection, recovers, publishes through a second client, and checks exact trimming and preservation of identity and payload.
