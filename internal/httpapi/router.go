@@ -32,6 +32,7 @@ import (
 
 // Server wires the routes to the session manager.
 type Server struct {
+	verifier         auth.Verifier
 	sends            *sendledger.Store
 	sendSlots        chan struct{}
 	cfg              config.Config
@@ -213,7 +214,7 @@ func (s *Server) auth(next http.Handler) http.Handler {
 			})
 			return
 		}
-		if err := auth.Verify(sessionName, s.cfg.SecretKey, token); err != nil {
+		if err := s.verifier.Verify(sessionName, s.cfg.SecretKey, token); err != nil {
 			writeJSON(w, http.StatusUnauthorized, map[string]any{
 				"error": "Check that the Session and Token are correct",
 			})

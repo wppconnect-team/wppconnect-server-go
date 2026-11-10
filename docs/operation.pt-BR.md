@@ -144,3 +144,5 @@ go run ./cmd/smoke-image -image wppconnect-go:check -platform linux/amd64
 Use `linux/arm64` nas duas opções para testar a variante ARM com emulação ou
 host compatível. O CI executa essas verificações antes da publicação;
 a release `v0.1.3` inclui as imagens aprovadas para as duas arquiteturas.
+
+O runtime reaproveita por até 30 segundos a verificação bem-sucedida de um token de sessão. A decisão depende da sessão, do segredo atual e do token exatos, em 256 posições fixas na memória do processo. O cache não guarda tokens nem tentativas inválidas. Mudar o segredo ou o token, reiniciar o processo, atingir o prazo ou ocupar a mesma posição exige nova verificação bcrypt. As permissões do workspace e de cada operação continuam verificadas a cada pedido.
