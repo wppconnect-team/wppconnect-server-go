@@ -272,6 +272,15 @@ func main() {
 	}
 	defer db.Close()
 	a := &relay{b, secret, token, "https://cloud.wppconnect.io/api/v1/sessions/" + b.Session + "/send-text", db, &http.Client{Timeout: 65 * time.Second, CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}, time.Now, make(chan struct{}, 8)}
-	srv := http.Server{Addr: "127.0.0.1:8098", Handler: a, ReadHeaderTimeout: 5 * time.Second, ReadTimeout: 15 * time.Second, WriteTimeout: 75 * time.Second, IdleTimeout: 30 * time.Second, MaxHeaderBytes: 16384}
+	mux := http.NewServeMux()
+	mux.Handle("/chatwoot", a)
+	incoming, err := configureIncoming(a, os.Getenv("CHATWOOT_BASE_URL"), os.Getenv("CHATWOOT_API_TOKEN"), os.Getenv("WPP_WEBHOOK_SECRET"), os.Getenv("WPP_PEER_LID"))
+	if err != nil {
+		log.Fatal(err)
+	}
+	if incoming != nil {
+		mux.Handle("/wpp", incoming)
+	}
+	srv := http.Server{Addr: "127.0.0.1:8098", Handler: mux, ReadHeaderTimeout: 5 * time.Second, ReadTimeout: 15 * time.Second, WriteTimeout: 75 * time.Second, IdleTimeout: 30 * time.Second, MaxHeaderBytes: 16384}
 	log.Fatal(srv.ListenAndServe())
 }

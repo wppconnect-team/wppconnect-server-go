@@ -3,6 +3,7 @@ package media
 import (
 	"github.com/polymorfa/hypermeow/proto/waE2E"
 	"github.com/polymorfa/hypermeow/types/events"
+	"google.golang.org/protobuf/reflect/protoreflect"
 	"strings"
 )
 
@@ -20,6 +21,32 @@ func pollCreation(msg *waE2E.Message) *waE2E.PollCreationMessage {
 		}
 	}
 	return nil
+}
+
+// ordinaryText accepts only known text fields on the original envelope. New or
+// wrapped formats must not become persistent text just because Unwrap found a body.
+func ordinaryText(evt *events.Message) bool {
+	raw := evt.RawMessage
+	if raw == nil {
+		raw = evt.Message
+	}
+	if raw == nil || evt.IsEphemeral || evt.IsViewOnce || evt.IsViewOnceV2 || evt.IsViewOnceV2Extension || len(raw.ProtoReflect().GetUnknown()) != 0 {
+		return false
+	}
+	ctx := raw.GetExtendedTextMessage().GetContextInfo()
+	if ctx.GetExpiration() != 0 || ctx.GetEphemeralSettingTimestamp() != 0 || ctx.GetDisappearingMode() != nil {
+		return false
+	}
+	plain := raw.GetConversation() != "" || raw.GetExtendedTextMessage().GetText() != ""
+	raw.ProtoReflect().Range(func(f protoreflect.FieldDescriptor, _ protoreflect.Value) bool {
+		switch f.Name() {
+		case "conversation", "extendedTextMessage", "messageContextInfo":
+		default:
+			plain = false
+		}
+		return plain
+	})
+	return plain
 }
 
 // Event normalizes content while keeping the original webhook's id/from/body.
@@ -41,6 +68,9 @@ func Event(evt *events.Message) map[string]any {
 		"chatId": from, "fromMe": evt.Info.IsFromMe, "isGroupMsg": evt.Info.IsGroup,
 		"body": msg.GetConversation(), "type": "chat", "isMedia": false,
 		"t": evt.Info.Timestamp.Unix(),
+	}
+	if ordinaryText(evt) {
+		out["persistentText"] = true
 	}
 	if msg.GetExtendedTextMessage() != nil {
 		out["body"] = msg.GetExtendedTextMessage().GetText()
