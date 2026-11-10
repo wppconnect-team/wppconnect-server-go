@@ -9,3 +9,5 @@ O runtime envia o JSON do evento no corpo e a identidade estável em `X-WPP-Even
 O destino `n8n` é independente de `webhook`: pode falhar e ser reprocessado sem repetir entregas que outro destino concluiu. Use a [consulta e o replay de entregas](../../docs/event-delivery-operations.md) com `target=n8n`. O aceite HTTP confirma somente a resposta do workflow; o efeito comercial de uma etapa posterior precisa de verificação própria.
 
 Para validar em ambiente Linux com Docker e Go, execute `bash scripts/test-n8n.sh` na raiz do repositório. O teste importa o workflow e uma credencial temporária em um n8n isolado, rejeita uma credencial errada e verifica a resposta de uma execução autenticada.
+
+Eventos de QR indicam somente disponibilidade de pareamento: o código que vincula o dispositivo não é encaminhado ao n8n, Redis Streams nem SQS, inclusive em replay. O webhook dedicado de pareamento mantém o contrato original.

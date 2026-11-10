@@ -78,3 +78,30 @@ func TestIntegrationN8NReceiver(t *testing.T) {
 		t.Fatal("workflow did not return exactly the three projected fields")
 	}
 }
+
+func TestN8NPairingMaterialNotForwardedEvenOnReplay(t *testing.T) {
+	var calls atomic.Int32
+	receiver := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var fields map[string]any
+		if err := json.NewDecoder(r.Body).Decode(&fields); err != nil || len(fields) != 3 || fields["event"] != "qrcode" || fields["session"] != "test" || fields["available"] != true {
+			t.Error("unexpected QR projection")
+		}
+		calls.Add(1)
+	}))
+	defer receiver.Close()
+	dest, err := NewN8N(receiver.URL+"/webhook/test", strings.Repeat("x", 45))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer dest.Close()
+	qr := Event{Name: "qrcode", Session: "test", ID: "stable-id", Data: []byte(`{"event":"qrcode","urlcode":"private-test","futureField":"private-too"}`)}
+	for i := 1; i <= 2; i++ {
+		qr.Attempt = i
+		if e := dest.Deliver(context.Background(), qr); e != nil {
+			t.Fatal(e)
+		}
+	}
+	if calls.Load() != 2 || !bytes.Contains(qr.Data, []byte("private-test")) {
+		t.Fatal("source event or calls changed")
+	}
+}

@@ -39,6 +39,7 @@ func NewRedisStream(raw, key string, limit int) (*RedisStream, error) {
 func (t *RedisStream) Name() string { return "redis-streams" }
 func (t *RedisStream) Close() error { return t.client.Close() }
 func (t *RedisStream) Deliver(ctx context.Context, e Event) error {
+	e = externalIntegrationEvent(e)
 	if err := ctx.Err(); err != nil {
 		return err
 	}

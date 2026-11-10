@@ -64,6 +64,9 @@ func NewN8N(raw, token string) (*HTTP, error) {
 }
 func (h *HTTP) Close() error { h.Client.CloseIdleConnections(); return nil }
 func (h *HTTP) Deliver(ctx context.Context, e Event) error {
+	if h.workflowToken != "" {
+		e = externalIntegrationEvent(e)
+	}
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, h.URL, bytes.NewReader(e.Data))
 	if err != nil {
 		return err

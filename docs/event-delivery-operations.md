@@ -111,3 +111,5 @@ A confirmed append is a successful SendMessage response with a message ID. It do
 CI runs the SDK against an isolated ElasticMQ service. The fixture creates a temporary FIFO queue, checks rejection by a missing queue, publishes the same event twice, consumes it, checks the body/group/identity, and confirms no second message remains. These checks do not verify a production AWS account's IAM or KMS settings.
 
 For a separate authenticated n8n receiver with its own retry state, see the [workflow, setup and test](../examples/n8n/README.md).
+
+For n8n, SQS and Redis Streams only, QR events have a deliberately reduced body with event, session and available=true. The live device-link code is never forwarded to these destinations, including on replay. Other events use their original JSON.
