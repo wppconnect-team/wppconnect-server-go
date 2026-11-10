@@ -4,6 +4,12 @@ O servidor usa o SDK publico [wppconnect-team/hypermeow](https://github.com/wppc
 
 A revisao fixada no go.mod inclui os protocolos tulir ate c88388f e a correcao da migracao SQLite da base anterior. Nenhuma dependencia aponta para um caminho local. As licencas MPL-2.0 e MIT estao preservadas nos notices do artefato.
 
+## Resolucao de destinatarios
+
+A consulta de perfil pode omitir o LID de um numero registrado. O SDK consulta o contato nesse caso e aceita somente um resultado registrado cujo telefone consultado corresponda ao pedido original. Preserva o identificador canonico informado pelo WhatsApp, sem remover ou adicionar digitos por heuristica. Essa correcao esta incorporada no HyperMeow PR #4 e evita rejeitar um destinatario valido antes da transmissao.
+
+Um HTTP 502 de envio continua sendo tratado como resultado potencialmente incerto pelo ledger. Nao repita o comando com outra chave automaticamente: consulte `send-result` e investigue o resultado original. Uma correcao de resolucao nao altera retroativamente os registros de idempotencia.
+
 ## Migracao de sessoes
 
 O Whatsmeow anterior usa schema 16; o HyperMeow usa schema 19. O mesmo numero 16 tem significados diferentes nos forks. O upgrade verifica a presenca de `wasa_root_secret_id`, preserva seu valor e cria o indice de sender keys que pode faltar na origem. A coluna `username` e adicionada pela migracao 18.
