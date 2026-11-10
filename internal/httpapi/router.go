@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/polymorfa/hypermeow/types"
 	"github.com/skip2/go-qrcode"
 	"github.com/wppconnect-team/wppconnect-server-go/internal/account"
 	"github.com/wppconnect-team/wppconnect-server-go/internal/auth"
@@ -24,13 +25,15 @@ import (
 	"github.com/wppconnect-team/wppconnect-server-go/internal/groups"
 	"github.com/wppconnect-team/wppconnect-server-go/internal/history"
 	"github.com/wppconnect-team/wppconnect-server-go/internal/media"
+	"github.com/wppconnect-team/wppconnect-server-go/internal/sendledger"
 	"github.com/wppconnect-team/wppconnect-server-go/internal/session"
 	"github.com/wppconnect-team/wppconnect-server-go/internal/vault"
-	"github.com/polymorfa/hypermeow/types"
 )
 
 // Server wires the routes to the session manager.
 type Server struct {
+	sends            *sendledger.Store
+	sendSlots        chan struct{}
 	cfg              config.Config
 	mgr              *session.Manager
 	mediaSession     func(string) (media.Client, *media.Store, bool)
@@ -57,12 +60,14 @@ func NewRouterWithEvents(cfg config.Config, mgr *session.Manager, bus *eventbus.
 }
 
 type Services struct {
+	Sends  *sendledger.Store
 	Events *eventbus.Bus
 	Media  *vault.Vault
 }
 
 func NewRouterWithServices(cfg config.Config, mgr *session.Manager, services Services) http.Handler {
 	s := &Server{cfg: cfg, mgr: mgr}
+	s.sends = services.Sends
 	s.channelSession = func(name string) (channels.Client, bool) {
 		h, ok := mgr.Get(name)
 		if !ok || h.GetStatus() != session.StatusConnected {
@@ -111,6 +116,7 @@ func NewRouterWithServices(cfg config.Config, mgr *session.Manager, services Ser
 }
 
 func (s *Server) router() http.Handler {
+	s.sendSlots = make(chan struct{}, 4)
 	s.mediaSlots = make(chan struct{}, 4)
 	s.streams = make(chan struct{}, 32)
 	s.adminSessions = make(map[[32]byte]adminSession)
@@ -139,6 +145,8 @@ func (s *Server) router() http.Handler {
 
 	r.Group(func(protected chi.Router) {
 		protected.Use(s.auth)
+		protected.Use(s.idempotency)
+		protected.Get("/api/{session}/send-result", s.sendResult)
 		// Mirrors POST /api/:session/start-session
 		protected.Post("/api/{session}/start-session", s.startSession)
 		protected.Post("/api/{session}/pair-phone", s.pairPhone)
