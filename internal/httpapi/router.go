@@ -146,7 +146,9 @@ func (s *Server) router() http.Handler {
 	r.Group(func(protected chi.Router) {
 		protected.Use(s.auth)
 		protected.Use(s.idempotency)
-		protected.Get("/api/{session}/send-result", s.sendResult)
+		for _, route := range []string{"send-result", "newsletter-write-result", "newsletter-admin-result"} {
+			protected.Get("/api/{session}/"+route, s.sendResult)
+		}
 		// Mirrors POST /api/:session/start-session
 		protected.Post("/api/{session}/start-session", s.startSession)
 		protected.Post("/api/{session}/pair-phone", s.pairPhone)

@@ -158,6 +158,19 @@ func TestNewsletterContractsAndSideEffects(t *testing.T) {
 	if w := call("newsletter-mark-viewed", strings.Replace(body, "5,7", "7,8", 1), h.tokens["alpha"], "k"); w.Code != 409 || len(f.calls) != before+1 {
 		t.Fatal("changed view command not blocked", w.Code)
 	}
+	for _, c := range []struct {
+		path   string
+		status int
+	}{{"newsletter-write-result", 200}, {"newsletter-admin-result", 404}, {"send-result", 404}} {
+		req := httptest.NewRequest("GET", "/api/alpha/"+c.path, nil)
+		req.Header.Set("Authorization", "Bearer "+h.tokens["alpha"])
+		req.Header.Set("Idempotency-Key", "k")
+		res := httptest.NewRecorder()
+		h.router.ServeHTTP(res, req)
+		if res.Code != c.status {
+			t.Fatalf("result lookup %s: %d", c.path, res.Code)
+		}
+	}
 	f.role = types.NewsletterRoleSubscriber
 	invite := `{"id":"123@newsletter","phone":"555","caption":"Join","expiresInSeconds":90}`
 	post("newsletter-admin-invite", invite, 403)

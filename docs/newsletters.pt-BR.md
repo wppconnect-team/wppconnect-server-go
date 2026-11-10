@@ -24,3 +24,5 @@ Nas seis operações que alteram estado, use [Idempotency-Key](send-idempotency.
 ## Cobertura da comparação
 
 Os contratos acima cobrem aspectos de Z014, Z017, Z019, Z022, Z023, Z025, Z026 e Z027 da [matriz de referência](https://github.com/wppconnect-team/hypermeow/blob/main/docs/parity-contract-matrix.md). São adaptadores nativos com nomes e payloads próprios. Há diferenças explícitas, como o filtro indisponível em Z025 e os limites de imagem e de permissão em Z027. Os testes exercitam o roteador HTTP, o ledger SQLite, a composição da mensagem administrativa e o tratamento do ACK no SDK. O recebimento do convite em outra conta e a apresentação nos clientes móveis e Web ainda não foram validados.
+
+Consulte o resultado com GET e a mesma chave em `newsletter-admin-result` (termos e convite administrativo) ou `newsletter-write-result` (seguir, deixar, reagir e marcar como visto). Cada consulta só encontra resultados da sua categoria e sessão. A consulta de envios comuns `send-result` continua isolada das duas categorias.
