@@ -20,10 +20,12 @@ import (
 	"github.com/wppconnect-team/wppconnect-server-go/internal/media"
 
 	"github.com/polymorfa/hypermeow"
+	"github.com/polymorfa/hypermeow/socket"
 	"github.com/polymorfa/hypermeow/store/sqlstore"
 	"github.com/polymorfa/hypermeow/types"
 	"github.com/polymorfa/hypermeow/types/events"
 	waLog "github.com/polymorfa/hypermeow/util/log"
+	"slices"
 
 	_ "modernc.org/sqlite"
 )
@@ -253,6 +255,7 @@ func (m *Manager) openHandle(ctx context.Context, name string) (*Handle, error) 
 		return nil, fmt.Errorf("open chat index: %w", err)
 	}
 	client := whatsmeow.NewClient(deviceStore, m.log)
+	client.SocketConfig = &whatsmeow.SocketConfig{RaceURLs: slices.Clone(socket.RaceURLs)}
 	if err = ValidateSettings(record.Settings); err != nil {
 		index.Close()
 		container.Close()
@@ -369,6 +372,15 @@ func (m *Manager) startLocked(ctx context.Context, name string) (*Handle, error)
 			go m.permanent(h, revoked)
 		case *events.Message:
 			m.forwardMessage(h, v)
+		case *events.Star:
+			if h.History != nil {
+				ctx, cancel := context.WithTimeout(h.ctx, 10*time.Second)
+				err := h.History.ObserveStar(ctx, v)
+				cancel()
+				if err != nil && m.log != nil {
+					m.log.Warnf("star persistence failed: %v", err)
+				}
+			}
 		case *events.Receipt:
 			if h.History != nil {
 				ctx, cancel := context.WithTimeout(h.ctx, 10*time.Second)

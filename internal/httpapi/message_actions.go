@@ -11,11 +11,11 @@ import (
 	"time"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/polymorfa/hypermeow/proto/waE2E"
+	"github.com/polymorfa/hypermeow/types"
 	"github.com/wppconnect-team/wppconnect-server-go/internal/directory"
 	"github.com/wppconnect-team/wppconnect-server-go/internal/history"
 	"github.com/wppconnect-team/wppconnect-server-go/internal/messages"
-	"github.com/polymorfa/hypermeow/proto/waE2E"
-	"github.com/polymorfa/hypermeow/types"
 )
 
 func readStructured(w http.ResponseWriter, r *http.Request, value any) error {
@@ -47,6 +47,8 @@ func (s *Server) actionRoutes(r chi.Router) {
 	for _, name := range []string{"send-reaction", "edit-message", "delete-message", "mark-read", "mark-played"} {
 		r.Post("/api/{session}/"+name, s.messageAction(name))
 	}
+	r.Post("/api/{session}/star-message", s.starMessage)
+	r.Post("/api/{session}/message-star-state", s.messageStarState)
 	r.Post("/api/{session}/send-reply", s.sendText)
 }
 

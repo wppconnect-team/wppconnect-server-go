@@ -5,9 +5,9 @@ import (
 	"github.com/polymorfa/hypermeow/types"
 	"time"
 
-	"github.com/wppconnect-team/wppconnect-server-go/internal/media"
 	"github.com/polymorfa/hypermeow/proto/waE2E"
 	"github.com/polymorfa/hypermeow/types/events"
+	"github.com/wppconnect-team/wppconnect-server-go/internal/media"
 )
 
 // ProtocolEventSink handles receipts, labels, calls and channel events.
@@ -82,7 +82,11 @@ func (m *Manager) importHistory(h *Handle, evt *events.HistorySync) {
 			if err != nil {
 				continue
 			}
-			if err = h.History.Put(ctx, parsed.Info, parsed.Message); err != nil && m.log != nil {
+			err = h.History.Put(ctx, parsed.Info, parsed.Message)
+			if err == nil && item.GetMessage().Starred != nil {
+				err = h.History.SnapshotStar(ctx, parsed.Info, item.GetMessage().GetStarred())
+			}
+			if err != nil && m.log != nil {
 				m.log.Warnf("history sync message skipped: %v", err)
 			}
 		}

@@ -46,6 +46,7 @@ type Record struct {
 	Timestamp int64          `json:"t"`
 	Read      bool           `json:"read"`
 	Deleted   bool           `json:"deleted"`
+	Starred   *bool          `json:"starred,omitempty"`
 	Edited    bool           `json:"edited"`
 	Content   map[string]any `json:"content"`
 	Message   *waE2E.Message `json:"-"`
@@ -75,6 +76,7 @@ func Open(path string, options Options) (*Store, error) {
 	db.SetMaxOpenConns(1)
 	_, err = db.Exec(`PRAGMA busy_timeout=5000; PRAGMA journal_mode=WAL; PRAGMA foreign_keys=ON;
 CREATE TABLE IF NOT EXISTS history_messages(seq INTEGER PRIMARY KEY AUTOINCREMENT,chat TEXT NOT NULL,id TEXT NOT NULL,sender TEXT NOT NULL,from_me INTEGER NOT NULL,t INTEGER NOT NULL,read INTEGER NOT NULL,deleted INTEGER NOT NULL DEFAULT 0,edited INTEGER NOT NULL DEFAULT 0,content BLOB NOT NULL,protocol BLOB NOT NULL,bytes INTEGER NOT NULL,UNIQUE(chat,id));
+CREATE TABLE IF NOT EXISTS history_stars(message_seq INTEGER PRIMARY KEY REFERENCES history_messages(seq) ON DELETE CASCADE,starred INTEGER NOT NULL,changed_at INTEGER NOT NULL);
 CREATE INDEX IF NOT EXISTS history_chat_order ON history_messages(chat,seq DESC);
 CREATE INDEX IF NOT EXISTS history_age ON history_messages(t);
 CREATE TABLE IF NOT EXISTS history_labels(id TEXT PRIMARY KEY,name TEXT NOT NULL,color INTEGER NOT NULL,deleted INTEGER NOT NULL,updated INTEGER NOT NULL);
@@ -172,7 +174,7 @@ func historyContent(info types.MessageInfo, msg *waE2E.Message) map[string]any {
 func scan(row interface{ Scan(...any) error }) (Record, error) {
 	var r Record
 	var content, raw []byte
-	err := row.Scan(&r.Sequence, &r.Chat, &r.ID, &r.Sender, &r.FromMe, &r.Timestamp, &r.Read, &r.Deleted, &r.Edited, &content, &raw)
+	err := row.Scan(&r.Sequence, &r.Chat, &r.ID, &r.Sender, &r.FromMe, &r.Timestamp, &r.Read, &r.Deleted, &r.Edited, &r.Starred, &content, &raw)
 	if errors.Is(err, sql.ErrNoRows) {
 		return r, ErrNotFound
 	}
@@ -191,7 +193,7 @@ func scan(row interface{ Scan(...any) error }) (Record, error) {
 	return r, err
 }
 
-const columns = "seq,chat,id,sender,from_me,t,read,deleted,edited,content,protocol"
+const columns = "seq,chat,id,sender,from_me,t,read,deleted,edited,(SELECT starred FROM history_stars WHERE message_seq=history_messages.seq AND history_messages.deleted=0),content,protocol"
 
 func (s *Store) Get(ctx context.Context, chat, id string) (Record, error) {
 	return scan(s.db.QueryRowContext(ctx, "SELECT "+columns+" FROM history_messages WHERE chat=? AND id=? AND t>=?", chat, id, s.now().Add(-s.options.Retention).Unix()))
