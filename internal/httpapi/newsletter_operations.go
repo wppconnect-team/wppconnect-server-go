@@ -72,6 +72,7 @@ func newsletterInvite(value string) (string, error) {
 	return value, nil
 }
 func (s *Server) newsletterRoutes(r chi.Router) {
+	r.Post("/api/{session}/"+deleteNewsletter, s.removeNewsletter)
 	for _, operation := range []string{"newsletter-info-invite", "follow-newsletter-invite", "unfollow-newsletter-invite", "newsletter-reaction", "newsletter-mark-viewed", "newsletter-message-updates", "newsletter-accept-tos", "newsletter-admin-invite"} {
 		r.Post("/api/{session}/"+operation, s.newsletterOperation(operation))
 	}

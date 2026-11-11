@@ -146,3 +146,151 @@ func TestOwnCatalogMutationContracts(t *testing.T) {
 		t.Fatal("unconfirmed mutation retransmitted")
 	}
 }
+
+type productShop struct {
+	*shopWriter
+	input      types.BusinessProductInput
+	returnedID string
+	deleted    int
+}
+
+func (f *productShop) DeleteBusinessCollections(ctx context.Context, ids []string) error {
+	f.note(ctx)
+	f.ids = ids
+	return f.failure
+}
+func (f *productShop) CreateBusinessProduct(ctx context.Context, input types.BusinessProductInput, width, height int) (*types.BusinessProduct, error) {
+	f.note(ctx)
+	f.input = input
+	return &types.BusinessProduct{ID: f.returnedID, Hidden: input.Hidden, Price: input.Price, Currency: input.Currency, Status: types.BusinessProductStatus{Status: "pending"}}, f.failure
+}
+func (f *productShop) UpdateBusinessProduct(ctx context.Context, id string, input types.BusinessProductInput, width, height int) (*types.BusinessProduct, error) {
+	f.id = id
+	return f.CreateBusinessProduct(ctx, input, width, height)
+}
+func (f *productShop) DeleteBusinessProducts(ctx context.Context, ids []string) (int, error) {
+	f.note(ctx)
+	f.ids = ids
+	return f.deleted, f.failure
+}
+func TestOwnedCatalogProductContracts(t *testing.T) {
+	h := newMediaHarness(t)
+	f := &productShop{shopWriter: &shopWriter{roadmapChannels: &roadmapChannels{sender: h.client}, id: "collection", hidden: true}, returnedID: "p", deleted: 2}
+	ledger, err := sendledger.Open(filepath.Join(t.TempDir(), "receipts.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer ledger.Close()
+	api := (&Server{cfg: config.Config{SecretKey: "test-secret"}, sends: ledger, channelSession: func(name string) (channels.Client, bool) { return f, name == "alpha" }}).router()
+	call := func(method, op, body, session, token, key string, want int) *httptest.ResponseRecorder {
+		t.Helper()
+		r := httptest.NewRequest(method, "/api/"+session+"/"+op, strings.NewReader(body))
+		r.Header.Set("Authorization", "Bearer "+h.tokens[token])
+		r.Header.Set("Content-Type", "application/json")
+		if key != "" {
+			r.Header.Set("Idempotency-Key", key)
+		}
+		w := httptest.NewRecorder()
+		api.ServeHTTP(w, r)
+		if w.Code != want {
+			t.Fatalf("%s %s: HTTP %d %s", method, op, w.Code, w.Body.String())
+		}
+		return w
+	}
+
+	media := `"image_urls":["https://mmg.whatsapp.net/item"]`
+	fields := `{"name":"Teste","price":"987654321098765432","currency":"BRL","is_hidden":true,` + media + `}`
+	add := `{"product":` + fields + `}`
+	edit := `{"productId":"p","product":` + strings.Replace(fields, "true", "false", 1) + `}`
+	collections := `{"collectionIds":["c1","c2"]}`
+	products := `{"productIds":["p1","p2"]}`
+	ops := []struct {
+		name, body string
+		code       int
+		fragment   string
+	}{
+		{deleteCollections, collections, 200, `"requestedCount":2`},
+		{createProduct, add, 201, `"reviewStatus":"pending"`},
+		{updateProduct, edit, 200, `"hidden":false`},
+		{deleteProducts, products, 200, `"deletedCount":2`},
+	}
+	for _, op := range ops {
+		call("POST", op.name, op.body, "alpha", "alpha", "", 400)
+		call("POST", op.name, op.body, "alpha", "beta", "denied", 401)
+		before := f.calls
+		first := call("POST", op.name, op.body, "alpha", "alpha", op.name, op.code)
+		replay := call("POST", op.name, op.body, "alpha", "alpha", op.name, op.code)
+		if f.calls != before+1 || replay.Header().Get("Idempotency-Replayed") != "true" || first.Body.String() != replay.Body.String() || !strings.Contains(first.Body.String(), op.fragment) {
+			t.Fatalf("%s replay or receipt: %s", op.name, first.Body.String())
+		}
+		switch op.name {
+		case createProduct, updateProduct:
+			if f.input.Price != "987654321098765432" || f.input.Currency != "BRL" || f.input.Hidden != (op.name == createProduct) || !strings.Contains(first.Body.String(), f.input.Price) || (op.name == updateProduct && f.id != "p") {
+				t.Fatal("product identity, amount, currency or visibility changed")
+			}
+		case deleteCollections:
+			if !reflect.DeepEqual(f.ids, []string{"c1", "c2"}) || strings.Contains(first.Body.String(), "deletedCount") {
+				t.Fatal("invalid collection receipt", first.Body.String())
+			}
+		case deleteProducts:
+			if !reflect.DeepEqual(f.ids, []string{"p1", "p2"}) {
+				t.Fatal(f.ids)
+			}
+		}
+		call("POST", op.name, op.body+" ", "alpha", "alpha", op.name, 409)
+		call("GET", catalogWriteResult, "", "alpha", "alpha", op.name, 200)
+		call("GET", catalogWriteResult, "", "beta", "beta", op.name, 404)
+		call("GET", "newsletter-admin-result", "", "alpha", "alpha", op.name, 404)
+	}
+	before := f.calls
+	for i, bad := range []struct{ name, body string }{
+		{deleteCollections, `{"collectionIds":[]}`}, {deleteCollections, `{"collectionIds":["c","c"]}`},
+		{deleteProducts, `{"productIds":["p","p"]}`}, {deleteProducts, `{"productIds":["p"],"seller":"other"}`},
+		{createProduct, strings.Replace(add, "mmg.whatsapp.net", "example.test", 1)},
+		{createProduct, strings.Replace(add, "987654321098765432", "12.34", 1)},
+		{createProduct, strings.Replace(add, "BRL", "BR", 1)},
+		{createProduct, `{"product":{"name":"item","image_urls":[]}}`},
+		{createProduct, strings.Replace(add, `"name":`, `"seller":"other","name":`, 1)},
+		{updateProduct, strings.Replace(edit, `"is_hidden":false,`, "", 1)},
+		{updateProduct, strings.Replace(edit, `"productId":"p"`, `"productId":""`, 1)},
+	} {
+		call("POST", bad.name, bad.body, "alpha", "alpha", "bad-"+strconv.Itoa(i), 400)
+	}
+	if f.calls != before {
+		t.Fatal("invalid request dispatched")
+	}
+	for _, count := range []int{0, 1, 3, -1} {
+		f.deleted = count
+		want := 409
+		if count < 0 || count > 2 {
+			want = 502
+		}
+		key := "count-" + strconv.Itoa(count)
+		for range 2 {
+			res := call("POST", deleteProducts, products, "alpha", "alpha", key, want)
+			if want == 409 && (!strings.Contains(res.Body.String(), `"status":"partial"`) || !strings.Contains(res.Body.String(), `"deletedCount":`+strconv.Itoa(count))) {
+				t.Fatal(res.Body.String())
+			}
+		}
+	}
+	if f.calls != before+4 {
+		t.Fatal("repeated partial deletion")
+	}
+	f.returnedID = "wrong"
+	call("POST", updateProduct, edit, "alpha", "alpha", "wrong-id", 502)
+	f.returnedID = ""
+	call("POST", createProduct, add, "alpha", "alpha", "empty-id", 502)
+	f.failure = errors.New("fixture lost reply")
+	for _, op := range ops {
+		before := f.calls
+		for range 2 {
+			res := call("POST", op.name, op.body, "alpha", "alpha", "lost-"+op.name, 502)
+			if !strings.Contains(res.Body.String(), "unconfirmed") {
+				t.Fatal(res.Body.String())
+			}
+		}
+		if f.calls != before+1 {
+			t.Fatal("repeated uncertain command", op.name)
+		}
+	}
+}
