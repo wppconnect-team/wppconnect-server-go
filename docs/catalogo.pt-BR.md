@@ -16,6 +16,8 @@ Produtos incluem `id`, `name`, `price`, `currency`, `hidden` e `availability`. P
 
 A API rejeita campos desconhecidos e tamanhos fora dos limites com 400. Sem sessão conectada retorna 404; sem identidade telefônica da conta, 409. Falhas remotas não são tratadas como catálogo vazio. O contrato abrange parte de Z249, Z250, Z251 e Z269, com escopo restrito ao próprio vendedor. O teste com conta Business e catálogo real continua pendente.
 
+Uma sessão pareada e conectada ainda pode receber uma recusa do provedor ao consultar o catálogo. Para uma falha GraphQL, a resposta inclui o código numérico que o WhatsApp forneceu, quando disponível. Um HTTP 502 com `GraphQL 400` indica que a consulta falhou. A quantidade de produtos e o estado do catálogo continuam desconhecidos. Para testar a escrita, confirme o catálogo no WhatsApp Business e use um produto destinado ao teste.
+
 ## Criar e atualizar coleções e alterar a visibilidade de produtos
 
 Use POST na mesma sessão e inclua `Content-Type: application/json` e `Idempotency-Key`. Escolha uma chave por operação e guarde os bytes do corpo enviado. Na Cloud a credencial precisa do escopo `commerce:write`. O WhatsApp aplica as permissões da conta Business conectada.

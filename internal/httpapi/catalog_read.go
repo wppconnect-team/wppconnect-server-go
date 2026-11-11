@@ -3,6 +3,7 @@ package httpapi
 import (
 	"context"
 	"errors"
+	"fmt"
 	"github.com/go-chi/chi/v5"
 	wm "github.com/polymorfa/hypermeow"
 	"github.com/polymorfa/hypermeow/types"
@@ -85,7 +86,7 @@ func (s *Server) readCatalog(op string) http.HandlerFunc {
 			}
 			p, err := reader.GetCatalogProduct(ctx, owner, q.ProductID)
 			if err != nil {
-				directoryError(w, err)
+				catalogReadError(w, err)
 				return
 			}
 			if p == nil {
@@ -118,7 +119,7 @@ func (s *Server) readCatalog(op string) http.HandlerFunc {
 			if op == "own-catalog" {
 				p, err := reader.GetCatalog(ctx, owner, wm.GetCatalogParams{After: q.After, Limit: limit})
 				if err != nil {
-					directoryError(w, err)
+					catalogReadError(w, err)
 					return
 				}
 				if p == nil || len(p.Products) > limit || len(p.Next) > 2048 {
@@ -137,7 +138,7 @@ func (s *Server) readCatalog(op string) http.HandlerFunc {
 			} else {
 				p, err := reader.GetProductCollections(ctx, owner, wm.GetCollectionsParams{After: q.After, CollectionLimit: limit, ItemLimit: 1})
 				if err != nil {
-					directoryError(w, err)
+					catalogReadError(w, err)
 					return
 				}
 				if p == nil || len(p.Collections) > limit || len(p.Next) > 2048 {
@@ -158,6 +159,17 @@ func (s *Server) readCatalog(op string) http.HandlerFunc {
 		writeJSON(w, 200, map[string]any{"status": "success", "response": out})
 	}
 }
+func catalogReadError(w http.ResponseWriter, err error) {
+	status, _ := groupErrorStatus(err)
+	message := "WhatsApp catalog query failed"
+	var gql types.GraphQLError
+	if errors.As(err, &gql) && gql.Extensions.ErrorCode != 0 {
+		// The provider message and path can contain private merchant data.
+		message = fmt.Sprintf("WhatsApp catalog query failed (GraphQL %d)", gql.Extensions.ErrorCode)
+	}
+	writeJSON(w, status, map[string]any{"status": "error", "message": message})
+}
+
 func catalogMismatch(w http.ResponseWriter) {
 	writeJSON(w, 502, map[string]any{"status": "error", "message": "unexpected catalog response from upstream"})
 }
