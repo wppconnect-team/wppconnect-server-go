@@ -22,7 +22,7 @@ import (
 var sendKeyPattern = regexp.MustCompile(`^[A-Za-z0-9._:-]{1,128}$`)
 
 func idempotentSend(name string) bool {
-	if catalogMutation(name) {
+	if name == "star-message" || catalogMutation(name) {
 		return true
 	}
 	switch name {
@@ -41,6 +41,8 @@ func resultRoute(operation string) string {
 		return catalogWriteResult
 	}
 	switch operation {
+	case "star-message", "message-state-result":
+		return "message-state-result"
 	case "newsletter-write-result", "follow-newsletter-invite", "unfollow-newsletter-invite", "newsletter-reaction", "newsletter-mark-viewed":
 		return "newsletter-write-result"
 	case "newsletter-admin-result", "newsletter-admin-invite", "newsletter-accept-tos":

@@ -3,8 +3,10 @@ package session
 import (
 	"context"
 	"errors"
+	"github.com/polymorfa/hypermeow/socket"
 	"os"
 	"path/filepath"
+	"slices"
 	"sync"
 	"testing"
 	"time"
@@ -298,5 +300,24 @@ func TestSuccessfulStartOutlivesRequestAndConcurrentStartsReuseHandle(t *testing
 	wg.Wait()
 	if len(m.List()) != 1 {
 		t.Fatal("duplicate sessions")
+	}
+}
+
+func TestSessionSocketEndpoints(t *testing.T) {
+	m, _ := managerForTest(t, t.TempDir())
+	for _, name := range []string{"new", "restored"} {
+		if name == "restored" {
+			seedDevice(t, m, name)
+		}
+		h, err := m.Start(context.Background(), name)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if h.Client.SocketConfig == nil || !slices.Equal(h.Client.SocketConfig.RaceURLs, socket.RaceURLs) || len(h.Client.SocketConfig.RaceURLs) != 2 {
+			t.Fatal("active client does not use both Web endpoints")
+		}
+		if &h.Client.SocketConfig.RaceURLs[0] == &socket.RaceURLs[0] {
+			t.Fatal("session shares mutable SDK endpoint slice")
+		}
 	}
 }

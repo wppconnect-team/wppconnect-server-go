@@ -98,6 +98,20 @@ func extendedContract(name string) (routeContract, bool) {
 		c.body = textSchema()
 		c.body["required"] = []string{"phone", "message", "quotedMessageId"}
 		c.description = "Text with persisted quote from each destination chat; quoted keys/secrets cannot be supplied. Up to 100 mentions, 65536 text characters."
+	case "star-message", "message-star-state":
+		props := schema{"chatId": str(), "messageId": str()}
+		c.success = 200
+		if name == "star-message" {
+			props["star"] = boolean()
+			c.body = object(props, "chatId", "messageId", "star")
+			c.response = envelope(object(schema{"requested": boolean()}, "requested"))
+			c.description = "Set the favorite flag on a retained direct or group message. Idempotency-Key required. The SDK accepted the patch; read message-star-state for observed state."
+		} else {
+			c.body = object(props, "chatId", "messageId")
+			c.response = envelope(object(schema{"starred": schema{"type": "boolean", "nullable": true}}, "starred"))
+			c.description = "Read the last observed favorite flag. Null means no retained observation."
+		}
+		c.body["additionalProperties"] = false
 	case "send-reaction", "edit-message", "delete-message", "mark-read", "mark-played":
 		c.body = requestSchema(actionRequest{}, "phone")
 		c.description = "Target must exist in this session and chat. Only own messages may be edited/revoked; editing is limited to text and the SDK edit window. Empty reaction removes it. mark-read/mark-played require 1..100 received messageIds and preserve partial results."
