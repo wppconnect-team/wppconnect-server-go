@@ -3,6 +3,7 @@ package httpapi
 import (
 	"context"
 	"errors"
+	"fmt"
 	wm "github.com/polymorfa/hypermeow"
 	"github.com/polymorfa/hypermeow/types"
 	"github.com/wppconnect-team/wppconnect-server-go/internal/channels"
@@ -87,5 +88,25 @@ func TestOwnCatalogScopePagingAndPricePrecision(t *testing.T) {
 	f.fail = true
 	if strings.Contains(post("own-catalog", `{}`, "alpha", 502), "sensitive upstream") {
 		t.Fatal("exposed upstream details")
+	}
+}
+
+func TestCatalogReadFailureIdentifiesSourceWithoutExposingMerchant(t *testing.T) {
+	cases := []struct {
+		failure error
+		status  int
+		message string
+	}{
+		{fmt.Errorf("QueryCatalog: %w", types.GraphQLErrors{{Message: "private merchant fixture", Path: []string{"secret-path"}, Extensions: types.GraphQLErrorExtensions{ErrorCode: 400}}}), 502, "WhatsApp catalog query failed (GraphQL 400)"},
+		{fmt.Errorf("QueryProductCollections: %w", context.DeadlineExceeded), 504, "WhatsApp catalog query failed"},
+		{wm.ErrNotConnected, 503, "WhatsApp catalog query failed"},
+		{errors.New("private merchant fixture"), 502, "WhatsApp catalog query failed"},
+	}
+	for _, tc := range cases {
+		w := httptest.NewRecorder()
+		catalogReadError(w, tc.failure)
+		if w.Code != tc.status || !strings.Contains(w.Body.String(), tc.message) || strings.Contains(w.Body.String(), "private") || strings.Contains(w.Body.String(), "secret-path") {
+			t.Errorf("unexpected catalog response: %d %s", w.Code, w.Body)
+		}
 	}
 }
