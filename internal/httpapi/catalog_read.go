@@ -44,7 +44,7 @@ func catalogView(p types.BusinessProduct) catalogProductView {
 	return catalogProductView{p.ID, p.Name, p.Price, p.Currency, p.Hidden, p.Availability}
 }
 func (s *Server) catalogRoutes(r chi.Router) {
-	for _, op := range []string{createCollection, updateCollection, productVisibility, cartEnabled} {
+	for _, op := range catalogMutations {
 		r.Post("/api/{session}/"+op, s.writeCatalog(op))
 	}
 	for _, op := range []string{"own-catalog", "own-catalog-product", "own-catalog-collections"} {

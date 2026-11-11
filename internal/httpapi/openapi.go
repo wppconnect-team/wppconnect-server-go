@@ -328,6 +328,9 @@ func buildOpenAPI() []byte {
 			} else {
 				responses[code] = contentResponse("Success with the documented available protocol fields.", c.response)
 			}
+			if name == deleteProducts {
+				responses["409"] = contentResponse("Partial deletion reports requestedCount and deletedCount. A changed or pending idempotency key also returns 409.", schema{"anyOf": []schema{c.response, ref("Error")}})
+			}
 			if strings.Contains(name, "participant-group") {
 				responses["207"] = contentResponse("Partial participant operation", envelope(schema{"type": "object"}))
 			}
@@ -344,7 +347,7 @@ func buildOpenAPI() []byte {
 		}
 		params := make([]schema, 0)
 		if (method == http.MethodPost && idempotentSend(name)) || name == resultRoute(name) {
-			params = append(params, schema{"name": "Idempotency-Key", "in": "header", "required": name == resultRoute(name) || name == "star-message" || catalogMutation(name), "schema": schema{"type": "string", "pattern": `^[A-Za-z0-9._:-]{1,128}$`}, "description": "Unique per session. Repeat the exact method, route, query, Content-Type and body to recover the persisted response without sending again. Changed input returns 409. Pending/ambiguous outcomes are never automatically retried. Completed responses retained at least 7 days. Never reuse a key for a new operation."})
+			params = append(params, schema{"name": "Idempotency-Key", "in": "header", "required": name == resultRoute(name) || name == "star-message" || name == deleteNewsletter || catalogMutation(name), "schema": schema{"type": "string", "pattern": `^[A-Za-z0-9._:-]{1,128}$`}, "description": "Unique per session. Repeat the exact method, route, query, Content-Type and body to recover the persisted response without sending again. Changed input returns 409. Pending/ambiguous outcomes are never automatically retried. Completed responses retained at least 7 days. Never reuse a key for a new operation."})
 		}
 		for _, match := range pattern.FindAllStringSubmatch(path, -1) {
 			param := str()

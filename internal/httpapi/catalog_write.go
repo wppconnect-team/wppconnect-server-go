@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"net/http"
+	"slices"
 	"strings"
 	"time"
 	"unicode"
@@ -27,8 +28,10 @@ const cartEnabled = "set-cart-enabled"
 const productVisibility = "set-own-product-visibility"
 const catalogWriteResult = "catalog-write-result"
 
+var catalogMutations = []string{createCollection, updateCollection, productVisibility, cartEnabled, deleteCollections, createProduct, updateProduct, deleteProducts}
+
 func catalogMutation(name string) bool {
-	return name == createCollection || name == updateCollection || name == productVisibility || name == cartEnabled
+	return slices.Contains(catalogMutations, name)
 }
 
 type newCollection struct {
@@ -98,17 +101,27 @@ func (s *Server) writeCatalog(name string) http.HandlerFunc {
 			writeJSON(w, 409, map[string]any{"status": "error", "message": "connected account phone identity unavailable"})
 			return
 		}
-		api, ok := c.(catalogWriter)
-		if !ok {
-			writeJSON(w, 501, map[string]any{"status": "not_supported"})
-			return
-		}
 		if !s.acquireMedia(w, r) {
 			return
 		}
 		defer func() { <-s.mediaSlots }()
 		ctx, cancel := context.WithTimeout(r.Context(), 20*time.Second)
 		defer cancel()
+		switch name {
+		case deleteCollections, createProduct, updateProduct, deleteProducts:
+			api, ok := c.(catalogProductWriter)
+			if !ok {
+				writeJSON(w, 501, map[string]string{"status": "not_supported"})
+				return
+			}
+			writeProducts(ctx, w, r, name, api)
+			return
+		}
+		api, ok := c.(catalogWriter)
+		if !ok {
+			writeJSON(w, 501, map[string]any{"status": "not_supported"})
+			return
+		}
 		switch name {
 		case createCollection:
 			var q newCollection
@@ -171,6 +184,8 @@ func catalogWriteContract(name string) (routeContract, bool) {
 	c := routeContract{tag: "business", success: 200, description: "Mutate only the connected account's own catalog. Idempotency-Key is required. Recover the original result via catalog-write-result. Remote review can remain pending."}
 	collection := envelope(object(schema{"id": str(), "reviewStatus": str()}, "id", "reviewStatus"))
 	switch name {
+	case deleteCollections, createProduct, updateProduct, deleteProducts:
+		return productWriteContract(name, c), true
 	case createCollection:
 		c.success = 201
 		c.body = requestSchema(newCollection{}, "name", "productIds")

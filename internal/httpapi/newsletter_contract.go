@@ -6,6 +6,10 @@ func newsletterContract(name string) (routeContract, bool) {
 	case "newsletter-info-invite", "follow-newsletter-invite", "unfollow-newsletter-invite":
 		c.body = requestSchema(newsletterInviteRequest{}, "invite")
 		c.description = "Resolve an 8..128 character channel invite code or canonical https://whatsapp.com/channel/CODE link through WhatsApp. Follow/unfollow uses only the returned newsletter identity. No arbitrary URLs are fetched. Returned metadata is the lookup snapshot, not proof of a refreshed role."
+	case deleteNewsletter:
+		c.body = requestSchema(newsletterDeleteRequest{}, "id")
+		c.response = envelope(object(schema{"id": str(), "state": str()}, "id", "state"))
+		c.description = "Permanently delete an owned channel using a compatible Web session. Requires Idempotency-Key. Confirms the same channel ID and DELETED state. Consult newsletter-admin-result after a lost response."
 	case "newsletter-reaction":
 		c.body = requestSchema(newsletterReactionRequest{}, "id", "serverId", "reaction")
 		c.body["properties"].(schema)["reaction"] = str()

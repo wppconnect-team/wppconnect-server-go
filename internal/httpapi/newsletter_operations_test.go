@@ -189,3 +189,96 @@ func TestNewsletterContractsAndSideEffects(t *testing.T) {
 		t.Fatal("upstream error exposed")
 	}
 }
+
+type deleteChannelFixture struct {
+	*newsletterFixture
+	supported bool
+	deletions int
+	lost      bool
+}
+
+func (f *deleteChannelFixture) SupportsNewsletterDeletion() bool { return f.supported }
+func (f *deleteChannelFixture) DeleteNewsletter(ctx context.Context, jid types.JID) error {
+	f.note(ctx, "delete:"+jid.String())
+	f.deletions++
+	if f.lost {
+		return errors.New("response lost")
+	}
+	return nil
+}
+func TestOwnedNewsletterDeletion(t *testing.T) {
+	h := newMediaHarness(t)
+	f := &deleteChannelFixture{newsletterFixture: &newsletterFixture{roadmapChannels: &roadmapChannels{sender: h.client}, role: types.NewsletterRoleOwner}, supported: true}
+	ledger, e := sendledger.Open(filepath.Join(t.TempDir(), "ledger.db"))
+	if e != nil {
+		t.Fatal(e)
+	}
+	t.Cleanup(func() { ledger.Close() })
+	h.router = (&Server{cfg: config.Config{SecretKey: "test-secret"}, sends: ledger, channelSession: func(name string) (channels.Client, bool) { return f, name == "alpha" }}).router()
+	call := func(route, body, token, key string) *httptest.ResponseRecorder {
+		r := httptest.NewRequest("POST", "/api/alpha/"+route, strings.NewReader(body))
+		r.Header.Set("Authorization", "Bearer "+token)
+		r.Header.Set("Content-Type", "application/json")
+		if key != "" {
+			r.Header.Set("Idempotency-Key", key)
+		}
+		w := httptest.NewRecorder()
+		h.router.ServeHTTP(w, r)
+		return w
+	}
+
+	body := `{"id":"123@newsletter"}`
+	check := func(body, key string, want int) *httptest.ResponseRecorder {
+		t.Helper()
+		w := call(deleteNewsletter, body, h.tokens["alpha"], key)
+		if w.Code != want {
+			t.Fatalf("key %q: got %d: %s", key, w.Code, w.Body.String())
+		}
+		return w
+	}
+	check(body, "", 400)
+	if w := call(deleteNewsletter, body, h.tokens["beta"], "cross"); w.Code != 401 {
+		t.Fatal(w.Code)
+	}
+	check(`{"id":"123@g.us"}`, "invalid", 400)
+	check(`{"id":"123@newsletter","seller":"other"}`, "extra", 400)
+	f.supported = false
+	check(body, "desktop", 501)
+	if len(f.calls) != 0 {
+		t.Fatal(f.calls)
+	}
+	f.supported = true
+	f.wrongID = true
+	check(body, "wrong-id", 502)
+	f.wrongID = false
+	for _, role := range []types.NewsletterRole{types.NewsletterRoleAdmin, types.NewsletterRoleSubscriber} {
+		f.role = role
+		check(body, "role-"+string(role), 403)
+	}
+	if f.deletions != 0 {
+		t.Fatal("unauthorized deletion")
+	}
+	f.role = types.NewsletterRoleOwner
+	first := check(body, "owner", 200)
+	again := check(body, "owner", 200)
+	if first.Body.String() != again.Body.String() || !strings.Contains(first.Body.String(), `"state":"DELETED"`) || again.Header().Get("Idempotency-Replayed") != "true" || f.deletions != 1 {
+		t.Fatal("confirmation or replay mismatch")
+	}
+	check(`{"id":"124@newsletter"}`, "owner", 409)
+	f.lost = true
+	check(body, "lost", 502)
+	w := check(body, "lost", 502)
+	if !strings.Contains(w.Body.String(), "unconfirmed") || f.deletions != 2 {
+		t.Fatal("lost receipt repeated or treated as confirmed")
+	}
+	for route, want := range map[string]int{"newsletter-admin-result": 200, "newsletter-write-result": 404, "send-result": 404} {
+		req := httptest.NewRequest("GET", "/api/alpha/"+route, nil)
+		req.Header.Set("Authorization", "Bearer "+h.tokens["alpha"])
+		req.Header.Set("Idempotency-Key", "owner")
+		res := httptest.NewRecorder()
+		h.router.ServeHTTP(res, req)
+		if res.Code != want {
+			t.Fatal(route, res.Code)
+		}
+	}
+}
