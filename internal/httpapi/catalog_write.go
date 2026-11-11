@@ -16,17 +16,19 @@ type catalogWriter interface {
 	CreateBusinessCollection(context.Context, string, []string) (*types.BusinessCollectionMutationResult, error)
 	UpdateBusinessCollection(context.Context, string, types.BusinessCollectionUpdate) (*types.BusinessCollectionMutationResult, error)
 	SetBusinessProductVisibility(context.Context, string, bool) error
+	SetBusinessCartEnabled(context.Context, bool) error
 }
 
 var _ catalogWriter = channels.SDK{}
 
 const createCollection = "create-own-collection"
 const updateCollection = "update-own-collection"
+const cartEnabled = "set-cart-enabled"
 const productVisibility = "set-own-product-visibility"
 const catalogWriteResult = "catalog-write-result"
 
 func catalogMutation(name string) bool {
-	return name == createCollection || name == updateCollection || name == productVisibility
+	return name == createCollection || name == updateCollection || name == productVisibility || name == cartEnabled
 }
 
 type newCollection struct {
@@ -39,6 +41,10 @@ type collectionChange struct {
 	Add          []string `json:"addProductIds,omitempty"`
 	Remove       []string `json:"removeProductIds,omitempty"`
 }
+type cartSetting struct {
+	Enabled *bool `json:"enabled"`
+}
+
 type visibilityChange struct {
 	ProductID string `json:"productId"`
 	Hidden    *bool  `json:"hidden"`
@@ -128,6 +134,21 @@ func (s *Server) writeCatalog(name string) http.HandlerFunc {
 			}
 			v, e := api.UpdateBusinessCollection(ctx, q.CollectionID, types.BusinessCollectionUpdate{Name: q.Name, AddProductIDs: q.Add, RemoveProductIDs: q.Remove})
 			renderCollection(w, v, q.CollectionID, e, 200)
+		case cartEnabled:
+			var q cartSetting
+			if err := readStructured(w, r, &q); err != nil {
+				invalidCatalog(w, err)
+				return
+			}
+			if q.Enabled == nil {
+				invalidCatalog(w, errors.New("provide an explicit enabled boolean"))
+				return
+			}
+			if err := api.SetBusinessCartEnabled(ctx, *q.Enabled); err != nil {
+				catalogUpstreamError(w)
+				return
+			}
+			writeJSON(w, http.StatusCreated, map[string]any{"status": "success", "response": q})
 		case productVisibility:
 			var q visibilityChange
 			if e := readStructured(w, r, &q); e != nil {
@@ -154,6 +175,11 @@ func catalogWriteContract(name string) (routeContract, bool) {
 		c.success = 201
 		c.body = requestSchema(newCollection{}, "name", "productIds")
 		c.response = collection
+	case cartEnabled:
+		c.success = http.StatusCreated
+		c.body = object(schema{"enabled": boolean()}, "enabled")
+		c.body["additionalProperties"] = false
+		c.response = envelope(c.body)
 	case updateCollection:
 		c.body = requestSchema(collectionChange{}, "collectionId")
 		c.response = collection

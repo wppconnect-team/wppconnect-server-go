@@ -18,12 +18,13 @@ import (
 
 type shopWriter struct {
 	*roadmapChannels
-	calls    int
-	id, name string
-	ids      []string
-	update   types.BusinessCollectionUpdate
-	hidden   bool
-	failure  error
+	calls       int
+	id, name    string
+	ids         []string
+	update      types.BusinessCollectionUpdate
+	cartEnabled bool
+	hidden      bool
+	failure     error
 }
 
 func (f *shopWriter) note(ctx context.Context) {
@@ -49,6 +50,12 @@ func (f *shopWriter) SetBusinessProductVisibility(ctx context.Context, id string
 	f.hidden = hidden
 	return f.failure
 }
+func (f *shopWriter) SetBusinessCartEnabled(ctx context.Context, enabled bool) error {
+	f.note(ctx)
+	f.cartEnabled = enabled
+	return f.failure
+}
+
 func TestOwnCatalogMutationContracts(t *testing.T) {
 	h := newMediaHarness(t)
 	f := &shopWriter{roadmapChannels: &roadmapChannels{sender: h.client}, id: "collection", hidden: true}
@@ -79,6 +86,8 @@ func TestOwnCatalogMutationContracts(t *testing.T) {
 	for i, v := range []struct{ op, body string }{
 		{createCollection, `{"name":"sale","productIds":["a","a"]}`}, {createCollection, `{"name":"sale","productIds":[]}`},
 		{updateCollection, `{"collectionId":"c"}`}, {updateCollection, `{"collectionId":"c","addProductIds":["x"],"removeProductIds":["x"]}`},
+		{cartEnabled, `{}`}, {cartEnabled, `{"enabled":null}`}, {cartEnabled, `{"enabled":"false"}`},
+		{cartEnabled, `{"enabled":false,"seller":"other"}`},
 		{productVisibility, `{"productId":"p"}`}, {productVisibility, `{"productId":"p","hidden":false,"seller":"other"}`},
 	} {
 		call("POST", v.op, v.body, "alpha", "alpha", "invalid-"+strconv.Itoa(i), 400)
@@ -104,10 +113,32 @@ func TestOwnCatalogMutationContracts(t *testing.T) {
 		call("GET", op, "", "alpha", "alpha", "create-key", 404)
 	}
 	call("GET", catalogWriteResult, "", "beta", "beta", "create-key", 404)
+	call("POST", cartEnabled, `{"enabled":true}`, "alpha", "beta", "forbidden-cart", 401)
+	call("POST", cartEnabled, `{"enabled":true}`, "alpha", "alpha", "", 400)
+	for _, enabled := range []bool{true, false} {
+		body := `{"enabled":` + strconv.FormatBool(enabled) + `}`
+		key := "cart-" + strconv.FormatBool(enabled)
+		before := f.calls
+		call("POST", cartEnabled, body, "alpha", "alpha", key, 201)
+		replay := call("POST", cartEnabled, body, "alpha", "alpha", key, 201)
+		if f.calls != before+1 || f.cartEnabled != enabled || replay.Header().Get("Idempotency-Replayed") != "true" || !strings.Contains(replay.Body.String(), body) {
+			t.Fatalf("cart update or replay differed for enabled=%t", enabled)
+		}
+		call("GET", catalogWriteResult, "", "alpha", "alpha", key, 200)
+		call("GET", catalogWriteResult, "", "beta", "beta", key, 404)
+	}
+	call("POST", cartEnabled, `{"enabled":true}`, "alpha", "alpha", "cart-false", 409)
 	f.id = "wrong"
 	call("POST", updateCollection, `{"collectionId":"collection","name":"Changed"}`, "alpha", "alpha", "wrong-result", 502)
 	f.failure = errors.New("transport")
 	before := f.calls
+	for range 2 {
+		call("POST", cartEnabled, `{"enabled":false}`, "alpha", "alpha", "cart-uncertain", 502)
+	}
+	if f.calls != before+1 {
+		t.Fatal("unconfirmed cart setting retransmitted")
+	}
+	before = f.calls
 	for range 2 {
 		call("POST", productVisibility, `{"productId":"20","hidden":true}`, "alpha", "alpha", "uncertain", 502)
 	}

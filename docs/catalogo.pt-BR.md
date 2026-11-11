@@ -26,6 +26,7 @@ Use POST na mesma sessão e inclua `Content-Type: application/json` e `Idempoten
 | --- | --- | --- |
 | `create-own-collection` | `{"name":"Verão","productIds":["10","20"]}` | 201 com `response.id` e `reviewStatus`. A revisão pode estar pendente. |
 | `update-own-collection` | `{"collectionId":"42","name":"Ofertas","addProductIds":["30"],"removeProductIds":["10"]}` | 200 com o ID da coleção e o estado de revisão retornado. |
+| `set-cart-enabled` | `{"enabled":false}` | 201 com o valor de `response.enabled` confirmado pelo WhatsApp. Envie `true` para habilitar o carrinho do vendedor. |
 | `set-own-product-visibility` | `{"productId":"20","hidden":false}` | 200 com o ID e a visibilidade solicitada após confirmação do protocolo. |
 
 A criação aceita de 1 a 100 IDs distintos. Na atualização, envie pelo menos uma alteração. As listas de inclusão e remoção admitem juntas até 100 IDs distintos. Nomes e IDs admitem até 256 bytes. Envie `hidden` como booleano explícito, inclusive para tornar o produto visível.
