@@ -8,7 +8,6 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/polymorfa/hypermeow/proto/waAdv"
 	"github.com/polymorfa/hypermeow/store/sqlstore"
 	"github.com/polymorfa/hypermeow/types"
 )
@@ -34,9 +33,14 @@ func TestHyperMeowUpgradesPreviousRuntimeDatabaseWithoutLosingCredentials(t *tes
 	container := sqlstore.NewWithDB(db, "sqlite", nil)
 	device := container.NewDevice()
 	id := types.NewJID("15550001111", types.DefaultUserServer)
-	device.ID = &id
-	device.Account = &waAdv.ADVSignedDeviceIdentity{Details: []byte{}, AccountSignature: make([]byte, 64), AccountSignatureKey: make([]byte, 32), DeviceSignature: make([]byte, 64)}
-	if err = device.Save(ctx); err != nil {
+	// Seed with the historical schema. The current SDK writes columns that
+	// only exist after Upgrade, so it cannot act as the v16 writer.
+	if _, err = db.ExecContext(ctx, `INSERT INTO whatsmeow_device
+		(jid, registration_id, noise_key, identity_key, signed_pre_key, signed_pre_key_id, signed_pre_key_sig,
+		 adv_key, adv_details, adv_account_sig, adv_account_sig_key, adv_device_sig)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, X'', zeroblob(64), zeroblob(32), zeroblob(64))`,
+		id.String(), device.RegistrationID, device.NoiseKey.Priv[:], device.IdentityKey.Priv[:],
+		device.SignedPreKey.Priv[:], device.SignedPreKey.KeyID, device.SignedPreKey.Signature[:], device.AdvSecretKey); err != nil {
 		t.Fatal(err)
 	}
 	if _, err = db.ExecContext(ctx, "INSERT INTO whatsmeow_chat_settings (our_jid,chat_jid,wasa_root_secret_id) VALUES (?,?,?)", id.String(), "15550002222@s.whatsapp.net", "existing-root"); err != nil {
@@ -52,8 +56,11 @@ func TestHyperMeowUpgradesPreviousRuntimeDatabaseWithoutLosingCredentials(t *tes
 	if !bytes.Equal(loaded.IdentityKey.Priv[:], device.IdentityKey.Priv[:]) || !bytes.Equal(loaded.NoiseKey.Priv[:], device.NoiseKey.Priv[:]) || !bytes.Equal(loaded.AdvSecretKey, device.AdvSecretKey) {
 		t.Fatal("credentials changed during migration")
 	}
+	if loaded.IsHosted {
+		t.Fatal("legacy device marked as hosted during upgrade")
+	}
 	var version int
-	if err = db.QueryRowContext(ctx, "SELECT version FROM whatsmeow_version").Scan(&version); err != nil || version != 19 {
+	if err = db.QueryRowContext(ctx, "SELECT version FROM whatsmeow_version").Scan(&version); err != nil || version != 20 {
 		t.Fatalf("version=%d, error=%v", version, err)
 	}
 	var secret string
