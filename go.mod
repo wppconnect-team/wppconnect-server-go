@@ -13,7 +13,7 @@ require (
 	github.com/google/uuid v1.6.0
 	github.com/minio/minio-go/v7 v7.4.1
 	github.com/nats-io/nats.go v1.55.0
-	github.com/polymorfa/hypermeow v0.0.0-20261116142645-cee9afa4987a
+	github.com/polymorfa/hypermeow v0.0.0-20261116143007-f2afdfbd9e11
 	github.com/rabbitmq/amqp091-go v1.16.0
 	github.com/redis/go-redis/v9 v9.21.0
 	github.com/skip2/go-qrcode v0.0.0-20200617195104-da1b6568686e
@@ -75,4 +75,4 @@ require (
 	modernc.org/memory v1.11.0 // indirect
 )
 
-replace github.com/polymorfa/hypermeow => github.com/wppconnect-team/hypermeow v0.0.0-20261116142645-cee9afa4987a
+replace github.com/polymorfa/hypermeow => github.com/wppconnect-team/hypermeow v0.0.0-20261116143007-f2afdfbd9e11
