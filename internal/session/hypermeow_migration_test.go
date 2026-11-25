@@ -46,6 +46,11 @@ func TestHyperMeowUpgradesPreviousRuntimeDatabaseWithoutLosingCredentials(t *tes
 	if _, err = db.ExecContext(ctx, "INSERT INTO whatsmeow_chat_settings (our_jid,chat_jid,wasa_root_secret_id) VALUES (?,?,?)", id.String(), "15550002222@s.whatsapp.net", "existing-root"); err != nil {
 		t.Fatal(err)
 	}
+	if _, err = db.ExecContext(ctx, `INSERT INTO whatsmeow_event_buffer
+		(our_jid, ciphertext_hash, plaintext, server_timestamp, insert_timestamp)
+		VALUES (?, zeroblob(32), NULL, 1, 1)`, id.String()); err != nil {
+		t.Fatal(err)
+	}
 	if err = container.Upgrade(ctx); err != nil {
 		t.Fatal(err)
 	}
@@ -60,8 +65,12 @@ func TestHyperMeowUpgradesPreviousRuntimeDatabaseWithoutLosingCredentials(t *tes
 		t.Fatal("legacy device marked as hosted during upgrade")
 	}
 	var version int
-	if err = db.QueryRowContext(ctx, "SELECT version FROM whatsmeow_version").Scan(&version); err != nil || version != 20 {
+	if err = db.QueryRowContext(ctx, "SELECT version FROM whatsmeow_version").Scan(&version); err != nil || version != 21 {
 		t.Fatalf("version=%d, error=%v", version, err)
+	}
+	var publication sql.NullBool
+	if err = db.QueryRowContext(ctx, "SELECT group_status FROM whatsmeow_event_buffer").Scan(&publication); err != nil || publication.Valid {
+		t.Fatalf("legacy receipt classification must remain unknown: %v", err)
 	}
 	var secret string
 	if err = db.QueryRowContext(ctx, "SELECT wasa_root_secret_id FROM whatsmeow_chat_settings").Scan(&secret); err != nil || secret != "existing-root" {
