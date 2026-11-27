@@ -40,6 +40,7 @@ func TestUnavailableMessagesRespectPhoneRerequestPolicy(t *testing.T) {
 	}{
 		{name: "default off", kind: "ordinary"},
 		{name: "view once with rerequests enabled", enable: true, kind: "view_once"},
+		{name: "sender drop with rerequests enabled", enable: true, kind: "sender_drop"},
 		{name: "ordinary with rerequests enabled", enable: true, kind: "ordinary", wantAttempt: true},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
